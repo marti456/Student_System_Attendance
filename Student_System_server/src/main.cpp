@@ -23,7 +23,7 @@ const long  gmtOffset_sec = 7200;      // UTC+2 (България стандар
 const int   daylightOffset_sec = 3600; // +1 час лятно часово време (UTC+3)
 
 #define DB_PATH "/sd/attendance.db" // Път до файла на базата данни на SD картата
-#define SD_CS_PIN 5                     // Пин за Chip Select на SD картата (проверете Вашия ESP32 борд)
+#define SD_CS_PIN 27                     // Пин за Chip Select на SD картата (проверете Вашия ESP32 борд)
 const int HTTP_PORT = 80;
 
 // Асинхронен сървър
@@ -95,15 +95,6 @@ bool setupDatabase() {
         return false;
     }
     Serial.println("Таблици създадени/проверени успешно.");
-    
-    // Попълване на примерните данни
-    if (!executeSQL(INSERT_DATA)) {
-        Serial.println("Грешка при попълване на примерни данни.");
-        // Грешката може да е, защото вече са вмъкнати (използваме INSERT OR IGNORE)
-        // Но е добре да се провери за сигурност.
-    }
-    Serial.println("Примерни данни вмъкнати/проверени.");
-
     return true;
 }
 
@@ -147,10 +138,6 @@ String processCheckIn(const String& uid, const String& room) {
     }
     
     // 2. НАМИРАНЕ НА ТЕКУЩИЯ СЛОТ (Schedule) в този кабинет
-    // Тъй като ESP32 няма надежден RTC, ще използваме ден от седмицата (6=Събота) и сравнение на HH:MM
-    
-    // Взимане на текущ час (само HH:MM) за сравнение
-     // Формат "2025-11-29 23:27:36" -> "23:27"
 
     String schedule_id_str = "";
     int current_schedule_id = 0;
@@ -159,8 +146,10 @@ String processCheckIn(const String& uid, const String& room) {
     
     struct tm timeinfo;
     getLocalTime(&timeinfo);
-    int day_of_week = timeinfo.tm_wday - 1;   // в ESP32 0=Неделя → правим 0=Понеделник
-    if (day_of_week < 0) day_of_week = 6; 
+    int day_of_week = timeinfo.tm_wday;   // в ESP32 0=Неделя → правим 0=Понеделник
+    if (day_of_week == 0){
+      day_of_week = 7; 
+    }
     String timestamp = getTimeNow(timeinfo);
     String current_time_str = timestamp.substring(11, 16);   // ако е неделя (0) → става 6
 
@@ -188,6 +177,28 @@ String processCheckIn(const String& uid, const String& room) {
     
     if (current_schedule_id == 0) {
         return "ERROR: В момента няма насрочен час в този кабинет.";
+    }
+
+    int existing_attendance = 0;
+    
+    char *sql_check_duplicate = sqlite3_mprintf(
+        "SELECT COUNT(*) FROM Attendance WHERE student_id = %d AND schedule_id = %d;",
+        student_id, current_schedule_id
+    );
+
+    sqlite3_stmt *stmt_check;
+    if (sqlite3_prepare_v2(db, sql_check_duplicate, -1, &stmt_check, 0) == SQLITE_OK) {
+        if (sqlite3_step(stmt_check) == SQLITE_ROW) {
+            existing_attendance = sqlite3_column_int(stmt_check, 0);
+        }
+    }
+    sqlite3_finalize(stmt_check);
+    sqlite3_free(sql_check_duplicate);
+
+    // Ако броят на записите е по-голям от 0, връщаме успех със съобщение, че вече е чекиран.
+    if (existing_attendance > 0) {
+        // Връщаме 200 OK, както поискахте
+        return "SUCCESS: Присъствието на " + student_info + " вече е записано за този час.";
     }
 
     // 3. ОПРЕДЕЛЯНЕ НА СТАТУСА (Присъствие vs Отработване)
@@ -316,7 +327,7 @@ void setup_wifi() {
 
 void setup() {
     Serial.begin(115200);
-
+    SPI.begin(14, 12, 13, SD_CS_PIN);
     // 1. WiFi
     setup_wifi();
 

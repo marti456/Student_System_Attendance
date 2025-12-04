@@ -16,6 +16,9 @@ const String endpoint = "/checkin";
 // --- КОНФИГУРАЦИЯ НА RFID ЧЕТЕЦА (RC522) ---
 #define RST_PIN D3  // GPIO0
 #define SS_PIN D8   // GPIO15
+#define BUZZER_PIN D0  // GPIO14
+#define RED_LED_PIN D1  // GPIO15
+#define GREEN_LED_PIN D2  // GPIO16
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Създаване на инстанция
 
@@ -90,10 +93,26 @@ void sendDataToServer(String uid) {
       
       // Добавете тук логика за светване на зелен/червен LED в зависимост от отговора
       // напр. ако отговорът съдържа "Успешно" -> зелен LED
+      if (httpResponseCode == 200) {
+        digitalWrite(GREEN_LED_PIN, HIGH);
+        tone(BUZZER_PIN, 1000, 150);
+      } else {
+        digitalWrite(RED_LED_PIN, HIGH);
+        tone(BUZZER_PIN, 300, 400);
+      }
+      
     } else {
       Serial.printf("[HTTP] Грешка, Код: %d\n", httpResponseCode);
+      digitalWrite(RED_LED_PIN, HIGH);
+      tone(BUZZER_PIN, 300, 400);
     }
-
+    delay(500); 
+    noTone(BUZZER_PIN);
+    
+    delay(1500); 
+    
+    digitalWrite(GREEN_LED_PIN, LOW);
+    digitalWrite(RED_LED_PIN, LOW);
     // Приключване на HTTP сесията
     http.end();
     Serial.println("Очаква се RFID карта...");
@@ -109,6 +128,14 @@ void sendDataToServer(String uid) {
 void setup() {
   Serial.begin(115200);
   Serial.println();
+  pinMode(GREEN_LED_PIN, OUTPUT);
+  pinMode(RED_LED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+    
+    // Първоначално изключваме всички индикатори
+  digitalWrite(GREEN_LED_PIN, LOW);
+  digitalWrite(RED_LED_PIN, LOW);
+  noTone(BUZZER_PIN);
   setup_wifi();
 
   SPI.begin();       // Инициализиране на SPI
