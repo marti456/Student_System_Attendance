@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система за Присъствия</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .hidden { display: none !important; }
+        body { background-color: #f8f9fa; padding-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 class="text-center mb-4">IoT Система за Присъствия</h2>
+
+    <div id="loginSection" class="card mx-auto" style="max-width: 400px;">
+        <div class="card-body">
+            <h5 class="card-title text-center">Вход</h5>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label>Потребител</label>
+                    <input type="text" id="username" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label>Парола</label>
+                    <input type="password" id="password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Влез</button>
+                <div id="loginError" class="text-danger mt-2 hidden">Грешни данни!</div>
+            </form>
+        </div>
+    </div>
+
+    <div id="dashboardSection" class="hidden">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 id="welcomeMessage">Добре дошли</h4>
+            <button id="logoutBtn" class="btn btn-outline-danger">Изход</button>
+        </div>
+
+        <div id="teacherControls" class="card mb-4 hidden">
+            <div class="card-header bg-success text-white">Управление на присъствия (Преподавател/Админ)</div>
+            <div class="card-body">
+                <form id="addAttendanceForm" class="row g-3 align-items-end">
+                    <div class="col-auto">
+                        <label>ID Студент</label>
+                        <input type="number" id="addStudentId" class="form-control" required>
+                    </div>
+                    <div class="col-auto">
+                        <label>ID Разписание</label>
+                        <input type="number" id="addScheduleId" class="form-control" required>
+                    </div>
+                    <div class="col-auto">
+                        <label>Статус</label>
+                        <select id="addStatus" class="form-select">
+                            <option value="Присъствие">Присъствие</option>
+                            <option value="Отработване">Отработване</option>
+                            <option value="Извинено">Извинено</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-success">Добави ръчно</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Записи на присъствия</div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Студент ID</th>
+                            <th>Разписание ID</th>
+                            <th>Време</th>
+                            <th>Статус</th>
+                            <th id="actionColumn" class="hidden">Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceTableBody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:8000";
+    let token = localStorage.getItem("token");
+    let userRole = null;
+
+    // Помощна функция за декодиране на JWT
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Проверка на състоянието при зареждане
+    function checkAuthState() {
+        if (token) {
+            const payload = parseJwt(token);
+            if (payload) {
+                userRole = payload.role;
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('dashboardSection').classList.remove('hidden');
+                document.getElementById('welcomeMessage').innerText = `Здравей, ${payload.sub} (${userRole})`;
+                
+                if (userRole === 'teacher' || userRole === 'admin') {
+                    document.getElementById('teacherControls').classList.remove('hidden');
+                    document.getElementById('actionColumn').classList.remove('hidden');
+                }
+                loadAttendance();
+            } else {
+                logout();
+            }
+        }
+    }
+
+    // Логин логика
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append("username", document.getElementById('username').value);
+        formData.append("password", document.getElementById('password').value);
+
+        try {
+            const response = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                token = data.access_token;
+                localStorage.setItem("token", token);
+                document.getElementById('loginError').classList.add('hidden');
+                checkAuthState();
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error("Грешка при връзка със сървъра", err);
+        }
+    });
+
+    // Извличане на присъствията
+    async function loadAttendance() {
+        try {
+            const response = await fetch(`${API_BASE}/attendance`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            const tbody = document.getElementById('attendanceTableBody');
+            tbody.innerHTML = '';
+
+            data.forEach(att => {
+                const tr = document.createElement('tr');
+                let deleteBtnHtml = '';
+                if (userRole === 'teacher' || userRole === 'admin') {
+                    deleteBtnHtml = `<td><button onclick="deleteAttendance(${att.id})" class="btn btn-sm btn-danger">Изтрий</button></td>`;
+                }
+                
+                tr.innerHTML = `
+                    <td>${att.id}</td>
+                    <td>${att.student_id}</td>
+                    <td>${att.schedule_id}</td>
+                    <td>${new Date(att.timestamp).toLocaleString('bg-BG')}</td>
+                    <td><span class="badge bg-info">${att.status}</span></td>
+                    ${deleteBtnHtml}
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (err) {
+            console.error("Грешка при зареждане на данните", err);
+        }
+    }
+
+    // Ръчно добавяне на присъствие
+    document.getElementById('addAttendanceForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const studentId = document.getElementById('addStudentId').value;
+        const scheduleId = document.getElementById('addScheduleId').value;
+        const status = document.getElementById('addStatus').value;
+
+        // POST заявка с query параметри (така както е дефиниран ендпойнтът във FastAPI)
+        const url = `${API_BASE}/attendance?student_id=${studentId}&schedule_id=${scheduleId}&status=${status}`;
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                loadAttendance();
+                document.getElementById('addAttendanceForm').reset();
+            } else {
+                const err = await response.json();
+                alert(`Грешка: ${err.detail}`);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
+    // Изтриване на присъствие
+    async function deleteAttendance(id) {
+        if (!confirm("Сигурни ли сте, че искате да изтриете този запис?")) return;
+        try {
+            const response = await fetch(`${API_BASE}/attendance/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                loadAttendance();
+            } else {
+                const err = await response.json();
+                alert(`Грешка: ${err.detail}`);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    // Изход
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    function logout() {
+        token = null;
+        userRole = null;
+        localStorage.removeItem("token");
+        document.getElementById('dashboardSection').classList.add('hidden');
+        document.getElementById('loginSection').classList.remove('hidden');
+        document.getElementById('loginForm').reset();
+    }
+
+    // Инициализация
+    checkAuthState();
+</script>
+</body>
+</html>
