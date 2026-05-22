@@ -10,6 +10,24 @@ from auth import get_current_user, require_role, require_any_role, get_async_ses
 
 router = APIRouter()
 
+def get_cycle_window(now_date: datetime.date, schedule_start_date: datetime.date, is_biweekly: bool):
+    # Колко дни са минали от първото реално занятие за този предмет
+    delta = now_date - schedule_start_date
+    days_since_start = max(0, delta.days) 
+    
+    if is_biweekly:
+        # 14-дневен цикъл
+        cycle_index = days_since_start // 14
+        cycle_start = schedule_start_date + datetime.timedelta(days=cycle_index * 14)
+        cycle_end = cycle_start + datetime.timedelta(days=14)
+    else:
+        # 7-дневен цикъл
+        cycle_index = days_since_start // 7
+        cycle_start = schedule_start_date + datetime.timedelta(days=cycle_index * 7)
+        cycle_end = cycle_start + datetime.timedelta(days=7)
+        
+    return cycle_start, cycle_end
+
 # Helper: find current schedule by room and current time
 def _time_matches(slot_start: str, slot_end: str, now_time: datetime.time) -> bool:
     start = datetime.time(int(slot_start.split(":")[0]), int(slot_start.split(":")[1]))
@@ -19,55 +37,92 @@ def _time_matches(slot_start: str, slot_end: str, now_time: datetime.time) -> bo
 @router.post("/checkin")
 async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_session), api_key: str = None):
     # Note: for ESP32 protect with API key or use device JWT. Here it's open — add protection!
-    # 1. find student by rfid
+    # 1. Намиране на студента по RFID
     res = await db.execute(select(Student).where(Student.rfid_uid == payload.rfid_uid))
     student = res.scalar_one_or_none()
     if not student:
-        raise HTTPException(status_code=404, detail="Invalid RFID")
-    # 2. find schedule for this room and current time
+        raise HTTPException(status_code=404, detail="Невалиден RFID")
+
     now = datetime.datetime.utcnow()
-    weekday = now.isoweekday()  # 1..7
-    current_time = now.time().replace(second=0, microsecond=0)
-    res = await db.execute(select(Schedule).where(
-        and_(
-            Schedule.room_number == payload.room_number,
-            Schedule.day_of_week == weekday
+    now_date = now.date()
+    now_time = now.time()
+    now_weekday = now.weekday() # 0 = Понеделник, 6 = Неделя
+    # 2. Намираме кое разписание тече в момента в тази зала
+    res_sched = await db.execute(
+        select(Schedule).where(
+            and_(
+                Schedule.room_number == payload.room_number,
+                Schedule.day_of_week == now_weekday
+            )
         )
-    ))
-    schedules = res.scalars().all()
-    matched = None
-    for s in schedules:
-        if _time_matches(s.start_time, s.end_time, current_time):
-            matched = s
+    )
+    schedules = res_sched.scalars().all()
+    
+    matched_schedule = None
+    for sched in schedules:
+        if _time_matches(sched.start_time, sched.end_time, now_time):
+            matched_schedule = sched
             break
-    if not matched:
-        raise HTTPException(status_code=404, detail="No scheduled class right now in this room")
-    # 3. check duplicate
-    res = await db.execute(select(Attendance).where(
-        and_(Attendance.student_id == student.student_id, Attendance.schedule_id == matched.id)
-    ))
-    if res.scalar_one_or_none():
-        return {"detail": "Already checked in"}
-    # 4. determine status
-    status_text = "Присъствие" if student.group_id == matched.group_id else None
-    if status_text is None:
-        # check if student's group has this course elsewhere
-        res = await db.execute(select(Schedule).where(
-            and_(Schedule.group_id == student.group_id, Schedule.course_id == matched.course_id)
-        ))
-        if res.scalar_one_or_none():
-            status_text = "Отработване"
+            
+    if not matched_schedule:
+        raise HTTPException(status_code=404, detail="В момента няма активно занятие в тази зала.")
+    
+    # 3. ЗАЩИТА: Дали сме в активния период на този конкретен курс?
+    if not (matched_schedule.start_date <= now_date <= matched_schedule.end_date):
+        raise HTTPException(
+            status_code=403, 
+            detail="Този курс не е активен в момента (извън зададените дати)."
+        )
+    
+    # 4. Изчисляваме времевия прозорец за този урок (Academic Cycle)
+    is_biweekly = matched_schedule.week_parity in ['even', 'odd']
+    cycle_start, cycle_end = get_cycle_window(now_date, matched_schedule.start_date, is_biweekly)
+
+    # Преобразуваме датите обратно в datetime за заявката към базата данни
+    cycle_start_dt = datetime.datetime.combine(cycle_start, datetime.time.min)
+    cycle_end_dt = datetime.datetime.combine(cycle_end, datetime.time.min)
+
+    # 5. Проверяваме дали студентът вече има присъствие в ТОЗИ времеви прозорец за ТОЗИ предмет
+    stmt = select(Attendance).join(Schedule).where(
+        and_(
+            Attendance.student_id == student.student_id,
+            Schedule.course_id == matched_schedule.course_id,
+            Attendance.timestamp >= cycle_start_dt,
+            Attendance.timestamp < cycle_end_dt
+        )
+    )
+    res_cycle_att = await db.execute(stmt)
+    already_attended_in_cycle = res_cycle_att.scalars().first()
+
+    # 6. Вземане на финално решение за статуса
+    if already_attended_in_cycle:
+        # Вече си е взел урока за този цикъл (напр. идва в четна и нечетна седмица едновременно)
+        raise HTTPException(status_code=403, detail="Student not enrolled for this course")
+    else:
+        # Това му е първо идване за този учебен прозорец
+        if student.group_id == matched_schedule.group_id:
+            # Идва си със своята главна група
+            status_text = "Присъствие"
         else:
-            raise HTTPException(status_code=403, detail="Student not enrolled for this course")
-    # 5. insert attendance
-    att = Attendance(student_id=student.student_id, schedule_id=matched.id, timestamp=datetime.datetime.utcnow(), status=status_text)
+            # Идва с чужда група (нормално отработване)
+            status_text = "Отработване"
+
+    # 7. Записване в базата
+    att = Attendance(
+        student_id=student.student_id, 
+        schedule_id=matched_schedule.id, 
+        timestamp=now, 
+        status=status_text
+    )
     db.add(att)
+    
     try:
         await db.commit()
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        raise HTTPException(status_code=500, detail="DB error")
-    return {"detail": f"SUCCESS: {status_text}"}
+        raise HTTPException(status_code=400, detail="Възникна грешка при запис на присъствието.")
+    
+    return {"detail": f"Успешно регистрирано: {status_text}", "status": status_text}
 
 # GET attendance - students see only their own
 @router.get("/attendance", response_model=List[AttendanceOut])
@@ -89,7 +144,7 @@ async def add_attendance(student_id: int, schedule_id: int, status: str, db: Asy
     if current_user.role == "teacher":
         res = await db.execute(select(Schedule).where(Schedule.id == schedule_id))
         sched = res.scalar_one_or_none()
-        if not sched or sched.teacher_id != current_user.id:
+        if not sched or sched.teacher_id != current_user.linked_teacher_id:
             raise HTTPException(status_code=403, detail="Not allowed for this schedule")
     # insert
     att = Attendance(student_id=student_id, schedule_id=schedule_id, timestamp=datetime.datetime.utcnow(), status=status)
@@ -112,7 +167,7 @@ async def delete_attendance(att_id: int, db: AsyncSession = Depends(get_async_se
     if current_user.role == "teacher":
         res = await db.execute(select(Schedule).where(Schedule.id == att.schedule_id))
         sched = res.scalar_one_or_none()
-        if not sched or sched.teacher_id != current_user.id:
+        if not sched or sched.teacher_id != current_user.linked_teacher_id:
             raise HTTPException(status_code=403, detail="Not allowed to delete this record")
     await db.delete(att)
     await db.commit()

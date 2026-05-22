@@ -36,53 +36,131 @@
     <div id="dashboardSection" class="hidden">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h4 id="welcomeMessage">Добре дошли</h4>
-            <button id="logoutBtn" class="btn btn-outline-danger">Изход</button>
-        </div>
-
-        <div id="teacherControls" class="card mb-4 hidden">
-            <div class="card-header bg-success text-white">Управление на присъствия (Преподавател/Админ)</div>
-            <div class="card-body">
-                <form id="addAttendanceForm" class="row g-3 align-items-end">
-                    <div class="col-auto">
-                        <label>ID Студент</label>
-                        <input type="number" id="addStudentId" class="form-control" required>
-                    </div>
-                    <div class="col-auto">
-                        <label>ID Разписание</label>
-                        <input type="number" id="addScheduleId" class="form-control" required>
-                    </div>
-                    <div class="col-auto">
-                        <label>Статус</label>
-                        <select id="addStatus" class="form-select">
-                            <option value="Присъствие">Присъствие</option>
-                            <option value="Отработване">Отработване</option>
-                            <option value="Извинено">Извинено</option>
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-success">Добави ръчно</button>
-                    </div>
-                </form>
+            <div>
+                <button id="showCreateUserBtn" class="btn btn-dark hidden me-2">Създай потребител</button>
+                <button id="logoutBtn" class="btn btn-outline-danger">Изход</button>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">Записи на присъствия</div>
+        <div id="attendanceView">
+            <div id="teacherControls" class="card mb-4 hidden">
+                <div class="card-header bg-success text-white">Управление на присъствия</div>
+                <div class="card-body">
+                    <form id="addAttendanceForm" class="row g-3 align-items-end">
+                        <div class="col-auto">
+                            <label>ID Студент</label>
+                            <input type="number" id="addStudentId" class="form-control" required>
+                        </div>
+                        <div class="col-auto">
+                            <label>ID Разписание</label>
+                            <input type="number" id="addScheduleId" class="form-control" required>
+                        </div>
+                        <div class="col-auto">
+                            <label>Статус</label>
+                            <select id="addStatus" class="form-select">
+                                <option value="Присъствие">Присъствие</option>
+                                <option value="Отработване">Отработване</option>
+                                <option value="Извинено">Извинено</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-success">Добави ръчно</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Записи на присъствия</div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Студент ID</th>
+                                <th>Разписание ID</th>
+                                <th>Време</th>
+                                <th>Статус</th>
+                                <th id="actionColumn" class="hidden">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTableBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="createUserView" class="card mb-4 hidden">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span>Бърза регистрация на нови лица</span>
+                <button id="backToDashboardBtn" class="btn btn-sm btn-outline-light">Назад към присъствията</button>
+            </div>
             <div class="card-body">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Студент ID</th>
-                            <th>Разписание ID</th>
-                            <th>Време</th>
-                            <th>Статус</th>
-                            <th id="actionColumn" class="hidden">Действие</th>
-                        </tr>
-                    </thead>
-                    <tbody id="attendanceTableBody">
-                        </tbody>
-                </table>
+                <div class="mb-3 col-md-4">
+                    <label class="fw-bold">Стъпка 1: Изберете какъв профил създавате</label>
+                    <select id="clerkRoleSelector" class="form-select bg-light fw-bold">
+                        <option value="student">Нов Студент</option>
+                        <option value="teacher">Нов Преподавател</option>
+                        <option value="admin">Нов Администратор</option>
+                    </select>
+                </div>
+                
+                <hr>
+
+                <form id="clerkRegistrationForm" class="row g-3">
+                    <div class="col-md-6">
+                        <label>Три имена</label>
+                        <input type="text" id="clerkName" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label>Потребителско име (за вход)</label>
+                        <input type="text" id="clerkUsername" class="form-control" placeholder="напр. fnum12345" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label>Парола</label>
+                        <input type="password" id="clerkPassword" class="form-control" required>
+                    </div>
+
+                    <div id="clerkStudentFields" class="row g-3 mt-1 p-0 m-0">
+                        <div class="col-md-3">
+                            <label class="text-primary">Факултетен номер</label>
+                            <input type="text" id="clerkFacultyNumber" class="form-control border-primary">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="text-primary">Код на RFID карта / чип</label>
+                            <input type="text" id="clerkRfidUid" class="form-control border-primary" placeholder="Сканирайте карта">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="text-primary">Група</label>
+                            <input type="text" id="clerkGroupName" class="form-control border-primary">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="text-primary">Курс</label>
+                            <select id="clerkGroupYear" class="form-select border-primary">
+                                <option value="1">1 курс</option>
+                                <option value="2">2 курс</option>
+                                <option value="3">3 курс</option>
+                                <option value="4">4 курс</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="text-primary">Специалност</label>
+                            <input type="text" id="clerkGroupMajor" class="form-control border-primary" placeholder="напр. КСТ">
+                        </div>
+                    </div>
+
+                    <div id="clerkTeacherFields" class="row g-3 mt-1 p-0 m-0 hidden">
+                        <div class="col-md-12">
+                            <label class="text-success">Катедра / Департамент</label>
+                            <input type="text" id="clerkDepartment" class="form-control border-success" placeholder="напр. Компютърни системи и технологии">
+                        </div>
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <button type="submit" class="btn btn-dark btn-lg w-100">Въведи в системата</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -115,6 +193,9 @@
                 if (userRole === 'teacher' || userRole === 'admin') {
                     document.getElementById('teacherControls').classList.remove('hidden');
                     document.getElementById('actionColumn').classList.remove('hidden');
+                }
+                if (userRole === 'admin') {
+                    document.getElementById('showCreateUserBtn').classList.remove('hidden');
                 }
                 loadAttendance();
             } else {
@@ -189,7 +270,7 @@
         const scheduleId = document.getElementById('addScheduleId').value;
         const status = document.getElementById('addStatus').value;
 
-        // POST заявка с query параметри (така както е дефиниран ендпойнтът във FastAPI)
+        // POST заявка с query параметри
         const url = `${API_BASE}/attendance?student_id=${studentId}&schedule_id=${scheduleId}&status=${status}`;
         
         try {
@@ -228,6 +309,142 @@
         }
     }
 
+    // --- НАВИГАЦИЯ ЗА АДМИН ---
+    document.getElementById('showCreateUserBtn')?.addEventListener('click', () => {
+        document.getElementById('attendanceView').classList.add('hidden');
+        document.getElementById('createUserView').classList.remove('hidden');
+    });
+
+    document.getElementById('backToDashboardBtn')?.addEventListener('click', () => {
+        document.getElementById('createUserView').classList.add('hidden');
+        document.getElementById('attendanceView').classList.remove('hidden');
+    });
+
+    // --- СЪЗДАВАНЕ НА ПОТРЕБИТЕЛ ---
+    // document.getElementById('createUserForm')?.addEventListener('submit', async (e) => {
+    //     e.preventDefault();
+        
+    //     const username = document.getElementById('newUsername').value;
+    //     const password = document.getElementById('newPassword').value;
+    //     const role = document.getElementById('newRole').value;
+    //     let linked_student_id = document.getElementById('newLinkedStudentId').value;
+
+    //     linked_student_id = linked_student_id ? parseInt(linked_student_id) : null;
+
+    //     const userData = { username, password, role, linked_student_id };
+
+    //     try {
+    //         const response = await fetch(`${API_BASE}/auth/users`, {
+    //             method: 'POST',
+    //             headers: { 
+    //                 'Content-Type': 'application/json',
+    //                 'Authorization': `Bearer ${token}` 
+    //             },
+    //             body: JSON.stringify(userData)
+    //         });
+
+    //         if (response.ok) {
+    //             alert(`Успех: Потребителят "${username}" е създаден!`);
+    //             document.getElementById('createUserForm').reset();
+    //             // Автоматично връщане към основния изглед
+    //             document.getElementById('createUserView').classList.add('hidden');
+    //             document.getElementById('attendanceView').classList.remove('hidden');
+    //         } else {
+    //             const err = await response.json();
+    //             alert(`Грешка: ${err.detail}`);
+    //         }
+    //     } catch (err) {
+    //         console.error("Грешка при връзка:", err);
+    //     }
+    // });
+    // Динамична промяна на полетата във формата спрямо избраната роля
+    document.getElementById('clerkRoleSelector')?.addEventListener('change', (e) => {
+        const role = e.target.value;
+        const nameField = document.getElementById('clerkName');
+        
+        if (role === 'student') {
+            document.getElementById('clerkStudentFields').classList.remove('hidden');
+            document.getElementById('clerkTeacherFields').classList.add('hidden');
+            nameField.parentElement.classList.remove('hidden'); // Показваме Името
+            nameField.required = true;
+        } else if (role === 'teacher') {
+            document.getElementById('clerkStudentFields').classList.add('hidden');
+            document.getElementById('clerkTeacherFields').classList.remove('hidden');
+            nameField.parentElement.classList.remove('hidden'); // Показваме Името
+            nameField.required = true;
+        } else if (role === 'admin') {
+            document.getElementById('clerkStudentFields').classList.add('hidden');
+            document.getElementById('clerkTeacherFields').classList.add('hidden');
+            nameField.parentElement.classList.add('hidden');
+            nameField.required = false;
+        }
+    });
+    // Изпращане на единната форма към бекенда
+    document.getElementById('clerkRegistrationForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const selectedRole = document.getElementById('clerkRoleSelector').value;
+        const name = document.getElementById('clerkName').value;
+        const username = document.getElementById('clerkUsername').value;
+        const password = document.getElementById('clerkPassword').value;
+
+        let url = `${API_BASE}/register/student`;
+        let bodyData = { username, password, name };
+
+        if (selectedRole === 'student') {
+            url = `${API_BASE}/auth/register/student`;
+            bodyData.name = document.getElementById('clerkName').value;
+            bodyData.faculty_number = document.getElementById('clerkFacultyNumber').value;
+            bodyData.rfid_uid = document.getElementById('clerkRfidUid').value;
+            
+            // Новите групови полета
+            bodyData.group_name = document.getElementById('clerkGroupName').value;
+            bodyData.group_year = parseInt(document.getElementById('clerkGroupYear').value);
+            bodyData.group_major = document.getElementById('clerkGroupMajor').value.toUpperCase(); // Автоматично прави КСТ главни букви
+            
+            if(!bodyData.faculty_number || !bodyData.rfid_uid || !bodyData.group_name || !bodyData.group_major) {
+                alert("Моля, попълнете всички студентски полета!");
+                return;
+            }
+        } else if (selectedRole === 'teacher') {
+            url = `${API_BASE}/auth/register/teacher`;
+            bodyData.name = document.getElementById('clerkName').value;
+            bodyData.department = document.getElementById('clerkDepartment').value || null;
+            if (!bodyData.name) {
+                alert("Моля, въведете три имена на преподавателя!");
+                return;
+            }
+        } else if (selectedRole === 'admin') {
+            url = `${API_BASE}/auth/register/admin`;
+        }
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify(bodyData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert(result.detail);
+                document.getElementById('clerkRegistrationForm').reset();
+                // Връщане обратно към главния екран
+                document.getElementById('createUserView').classList.add('hidden');
+                document.getElementById('attendanceView').classList.remove('hidden');
+                loadAttendance();
+            } else {
+                alert(`Грешка: ${result.detail}`);
+            }
+        } catch (err) {
+            console.error("Възникна грешка при комуникацията:", err);
+        }
+    });
+    
     // Изход
     document.getElementById('logoutBtn').addEventListener('click', logout);
     function logout() {
@@ -237,6 +454,11 @@
         document.getElementById('dashboardSection').classList.add('hidden');
         document.getElementById('loginSection').classList.remove('hidden');
         document.getElementById('loginForm').reset();
+        document.getElementById('showCreateUserBtn')?.classList.add('hidden');
+        document.getElementById('teacherControls')?.classList.add('hidden');
+        document.getElementById('actionColumn')?.classList.add('hidden');
+        document.getElementById('createUserView')?.classList.add('hidden');
+        document.getElementById('attendanceView')?.classList.remove('hidden');
     }
 
     // Инициализация

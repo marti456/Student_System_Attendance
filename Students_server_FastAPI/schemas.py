@@ -2,6 +2,26 @@ from pydantic import BaseModel
 from typing import Optional
 import datetime
 
+class StudentRegisterIn(BaseModel):
+    username: str
+    password: str
+    name: str
+    faculty_number: str
+    rfid_uid: Optional[str] = None
+    group_name: str
+    group_year: int
+    group_major: str
+
+class TeacherRegisterIn(BaseModel):
+    username: str
+    password: str
+    name: str
+    department: Optional[str] = None
+
+class AdminRegisterIn(BaseModel):
+    username: str
+    password: str
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
