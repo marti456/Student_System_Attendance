@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, and_
+from sqlalchemy import func, or_, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-from typing import List
+from typing import List, Optional
 import datetime
 
-from models import GroupCourse, Student, Schedule, Attendance, AsyncSessionLocal
-from schemas import CheckinIn, AttendanceOut
+from models import Course, GroupCourse, Student, Schedule, Attendance, AsyncSessionLocal
+from schemas import AttendanceUpdate, CheckinIn, AttendanceOut, PaginatedAttendanceOut
 from auth import get_current_user, require_role, require_any_role, get_async_session
 
 router = APIRouter()
@@ -134,58 +134,167 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
     return {"detail": f"Успешно регистрирано: {status_text}", "status": status_text}
 
 # GET attendance - students see only their own
-@router.get("/attendance", response_model=List[AttendanceOut])
-async def list_attendance(db: AsyncSession = Depends(get_async_session), current_user = Depends(get_current_user)):
-    # student -> linked_student_id must exist and only their records
+@router.get("/attendance", response_model=PaginatedAttendanceOut)
+async def list_attendance(
+    skip: int = 0, 
+    limit: int = 50, 
+    search: Optional[str] = None,
+    db: AsyncSession = Depends(get_async_session), 
+    current_user = Depends(get_current_user)
+):
+    # 1. Подготвяме базовата заявка с всички JOIN-ове
+    stmt = (
+        select(
+            Attendance.id, 
+            Attendance.timestamp, 
+            Attendance.status, 
+            Attendance.recorded_by,
+            Student.name.label("student_name"),
+            Student.faculty_number,
+            Course.name.label("course_name"),
+            GroupCourse.type.label("course_type")
+        )
+        .join(Student, Attendance.student_id == Student.student_id)
+        .join(Schedule, Attendance.schedule_id == Schedule.id)
+        .join(GroupCourse, Schedule.group_course_id == GroupCourse.id)
+        .join(Course, GroupCourse.course_id == Course.id)
+    )
+
+    # 2. Филтрираме по роля (ако е студент, вижда само своите)
     if current_user.role == "student":
-        if not current_user.linked_student_id:
-            raise HTTPException(status_code=400, detail="Student user not linked to student record")
-        res = await db.execute(select(Attendance).where(Attendance.student_id == current_user.linked_student_id))
-    else:
-        res = await db.execute(select(Attendance).order_by(Attendance.timestamp.desc()))
-    rows = res.scalars().all()
-    return rows
+        stmt = stmt.where(Attendance.student_id == current_user.linked_student_id)
+
+    # 3. УМНО ТЪРСЕНЕ: Търсим по Име ИЛИ по Факултетен номер
+    if search:
+        search_term = f"%{search}%"
+        stmt = stmt.where(
+            or_(
+                Student.name.ilike(search_term),
+                Student.faculty_number.ilike(search_term)
+            )
+        )
+
+    # 4. Вземаме ОБЩИЯ брой на записите (преди да отрежем 50-те бройки)
+    # Това е нужно, за да може фронтендът да нарисува бутоните за страници
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_res = await db.execute(count_stmt)
+    total_count = total_res.scalar()
+
+    # 5. Прилагаме сортиране, странициране (OFFSET) и лимит (LIMIT)
+    stmt = stmt.order_by(Attendance.timestamp.desc()).offset(skip).limit(limit)
+    res = await db.execute(stmt)
+    rows = res.all()
+    
+    # 6. Форматираме резултата
+    type_map = {'lecture': 'Лекция', 'exercise': 'Упражнение', 'lab': 'Лаб.'}
+    items = []
+    for row in rows:
+        items.append({
+            "id": row.id,
+            "timestamp": row.timestamp.isoformat(),
+            "status": row.status,
+            "recorded_by": row.recorded_by,
+            "student_name": f"{row.student_name} (ФН: {row.faculty_number})",
+            "course_name": f"{row.course_name} ({type_map.get(row.course_type, row.course_type)})"
+        })
+        
+    return {"total": total_count, "items": items}
 
 # teacher/admin add attendance manually
-@router.post("/attendance", dependencies=[Depends(require_any_role(["teacher"]))])
-async def add_attendance(student_id: int, schedule_id: int, status: str, db: AsyncSession = Depends(get_async_session), current_user = Depends(get_current_user)):
-    # teacher can only add for schedules they teach (unless admin)
+@router.post("/attendance", dependencies=[Depends(require_any_role(["teacher", "admin"]))])
+async def add_attendance(student_id: int, schedule_id: int, status: str, date: str, db: AsyncSession = Depends(get_async_session), current_user = Depends(get_current_user)):
+    
+    # 1. Извличаме разписанието
+    res_sched = await db.execute(select(Schedule).options(joinedload(Schedule.group_course)).where(Schedule.id == schedule_id))
+    sched = res_sched.scalar_one_or_none()
+    if not sched:
+        raise HTTPException(status_code=404, detail="Разписанието не е намерено.")
+        
     if current_user.role == "teacher":
-        res = await db.execute(
-            select(Schedule)
-            .options(joinedload(Schedule.group_course)) # ДОБАВЕНО
-            .where(Schedule.id == schedule_id)
+        if sched.group_course.teacher_id != current_user.linked_teacher_id:
+            raise HTTPException(status_code=403, detail="Нямате права да добавяте присъствия за този предмет.")
+            
+    # 2. Парсираме датата от фронтенда (очакваме формат "YYYY-MM-DD")
+    try:
+        target_date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Невалиден формат на датата.")
+
+    # 3. Създаваме точния времеви печат (Избраната дата + Началния час по график)
+    target_timestamp = datetime.datetime.combine(target_date, sched.start_time)
+    
+    # 4. Проверка за дублиране в РАМКИТЕ НА ИЗБРАНИЯ ДЕН
+    day_start = datetime.datetime.combine(target_date, datetime.time.min)
+    day_end = datetime.datetime.combine(target_date, datetime.time.max)
+    
+    stmt_duplicate = select(Attendance).where(
+        and_(
+            Attendance.student_id == student_id,
+            Attendance.schedule_id == schedule_id,
+            Attendance.timestamp >= day_start,
+            Attendance.timestamp <= day_end
         )
-        sched = res.scalar_one_or_none()
-        if not sched or sched.group_course.teacher_id != current_user.linked_teacher_id:
-            raise HTTPException(status_code=403, detail="Not allowed for this schedule")
-    # insert
-    att = Attendance(student_id=student_id, schedule_id=schedule_id, timestamp=datetime.datetime.now(), status=status, recorded_by=current_user.username)
+    )
+    existing = await db.execute(stmt_duplicate)
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"Студентът вече има присъствие за това занятие на дата {date}.")
+
+    # 5. Записване в базата
+    att = Attendance(
+        student_id=student_id, 
+        schedule_id=schedule_id, 
+        timestamp=target_timestamp, 
+        status=status, 
+        recorded_by=current_user.username
+    )
     db.add(att)
     try:
         await db.commit()
     except Exception:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="Could not insert (maybe duplicate)")
-    return {"detail": "Inserted"}
+        raise HTTPException(status_code=400, detail="Грешка при запис в базата данни.")
+        
+    return {"detail": "Присъствието е добавено успешно."}
+
+@router.patch("/attendance/{att_id}", dependencies=[Depends(require_any_role(["teacher", "admin"]))])
+async def update_attendance(att_id: int, payload: AttendanceUpdate, db: AsyncSession = Depends(get_async_session), current_user = Depends(get_current_user)):
+    res = await db.execute(select(Attendance).where(Attendance.id == att_id))
+    att = res.scalar_one_or_none()
+    if not att:
+        raise HTTPException(status_code=404, detail="Записът не е намерен.")
+        
+    if current_user.role == "teacher":
+        if att.recorded_by != "Автоматичен" and att.recorded_by != current_user.username:
+            raise HTTPException(status_code=403, detail="Нямате права да редактирате запис на администратор.")
+            
+    if payload.status:
+        att.status = payload.status
+        
+    await db.commit()
+    return {"detail": "Статусът на присъствието е променен."}
 
 # delete attendance
-@router.delete("/attendance/{att_id}", dependencies=[Depends(require_any_role(["teacher"]))])
+@router.delete("/attendance/{att_id}", dependencies=[Depends(require_any_role(["teacher", "admin"]))])
 async def delete_attendance(att_id: int, db: AsyncSession = Depends(get_async_session), current_user = Depends(get_current_user)):
     res = await db.execute(select(Attendance).where(Attendance.id == att_id))
     att = res.scalar_one_or_none()
     if not att:
-        raise HTTPException(status_code=404, detail="Not found")
-    # teacher can only delete for schedules they teach
+        raise HTTPException(status_code=404, detail="Не е намерено.")
+        
     if current_user.role == "teacher":
-        res = await db.execute(
-            select(Schedule)
-            .options(joinedload(Schedule.group_course)) # ДОБАВЕНО
-            .where(Schedule.id == att.schedule_id)
-        )
-        sched = res.scalar_one_or_none()
+        # 1. Проверка дали преподавателят води този предмет
+        res_sched = await db.execute(select(Schedule).options(joinedload(Schedule.group_course)).where(Schedule.id == att.schedule_id))
+        sched = res_sched.scalar_one_or_none()
         if not sched or sched.group_course.teacher_id != current_user.linked_teacher_id:
-            raise HTTPException(status_code=403, detail="Not allowed to delete this record")
+            raise HTTPException(status_code=403, detail="Нямате права да изтриете този запис.")
+            
+        # НОВО: 2. Проверка кой го е въвел (Учителят не може да трие записи на Админа)
+        if att.recorded_by != "Автоматичен" and att.recorded_by != current_user.username:
+            raise HTTPException(
+                status_code=403, 
+                detail="Нямате права да изтривате запис, въведен от администратор или друг служител."
+            )
+            
     await db.delete(att)
     await db.commit()
-    return {"detail": "Deleted"}
+    return {"detail": "Записът е изтрит."}

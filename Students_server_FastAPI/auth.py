@@ -285,17 +285,17 @@ async def update_teacher(teacher_id: int, payload: TeacherUpdate, db: AsyncSessi
     await db.commit()
     return {"detail": "Данните на преподавателя са обновени."}
 
-@router.get("/groups", response_model=List[GroupOut], dependencies=[Depends(require_role("admin"))])
+@router.get("/groups", response_model=List[GroupOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_groups(db: AsyncSession = Depends(get_async_session)):
     res = await db.execute(select(Group))
     return res.scalars().all()
 
-@router.get("/students", response_model=List[StudentOut], dependencies=[Depends(require_role("admin"))])
+@router.get("/students", response_model=List[StudentOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_students(db: AsyncSession = Depends(get_async_session)):
     res = await db.execute(select(Student))
     return res.scalars().all()
 
-@router.get("/teachers", response_model=List[TeacherOut], dependencies=[Depends(require_role("admin"))])
+@router.get("/teachers", response_model=List[TeacherOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_teachers(db: AsyncSession = Depends(get_async_session)):
     res = await db.execute(select(Teacher))
     return res.scalars().all()

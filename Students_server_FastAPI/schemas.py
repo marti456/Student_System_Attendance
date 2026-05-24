@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+from typing import List, Optional
 import datetime
 
 class StudentRegisterIn(BaseModel):
@@ -50,11 +50,12 @@ class CheckinIn(BaseModel):
 
 class AttendanceOut(BaseModel):
     id: int
-    student_id: int
-    schedule_id: int
     timestamp: datetime.datetime
     status: str
     recorded_by: str
+    student_name: str
+    course_name: str
+    model_config = ConfigDict(from_attributes=True)
 
 class CourseCreate(BaseModel):
     name: str = Field(..., max_length=150, description="Име на дисциплината")
@@ -161,3 +162,23 @@ class ScheduleOut(BaseModel):
     end_date: datetime.date
     subgroup: Optional[str]
     model_config = ConfigDict(from_attributes=True)
+
+class GroupUpdate(BaseModel):
+    name: Optional[str] = None
+    year: Optional[int] = None
+    major: Optional[str] = None
+
+class GroupCourseUpdate(BaseModel):
+    group_id: Optional[int] = None   # НОВО: Вече може да се сменя
+    course_id: Optional[int] = None  # НОВО: Вече може да се сменя
+    teacher_id: Optional[int] = None
+    type: Optional[str] = None
+    semester: Optional[int] = None
+
+# --- ДОБАВИ ТАЗИ СХЕМА ---
+class AttendanceUpdate(BaseModel):
+    status: Optional[str] = None
+
+class PaginatedAttendanceOut(BaseModel):
+    total: int
+    items: List[AttendanceOut]

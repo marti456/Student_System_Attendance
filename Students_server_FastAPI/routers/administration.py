@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from typing import List
-from models import Course, GroupCourse, Schedule, Teacher, Group
-from schemas import CourseCreate, CourseOut, GroupCourseCreate, GroupCourseOut, ScheduleCreate, ScheduleOut
-from auth import get_async_session, require_role
+from models import Course, GroupCourse, Schedule, Teacher, Group, User
+from schemas import CourseCreate, CourseOut, CourseUpdate, GroupCourseCreate, GroupCourseOut, GroupCourseUpdate, GroupUpdate, ScheduleCreate, ScheduleOut, ScheduleUpdate
+from auth import get_async_session, get_current_user, require_any_role, require_role
+from sqlalchemy.orm import joinedload
 
-router = APIRouter(prefix="/admin", tags=["Admin Curriculum Management"])
+router = APIRouter(tags=["Admin Curriculum Management"])
 
 @router.post("/courses", dependencies=[Depends(require_role("admin"))])
 async def create_course(payload: CourseCreate, db: AsyncSession = Depends(get_async_session)):
@@ -113,8 +114,18 @@ async def create_schedule_slot(payload: ScheduleCreate, db: AsyncSession = Depen
         
     return {"detail": "Новото занятие е въведено успешно в графика на залата."}
 
-from schemas import CourseUpdate, GroupCourseUpdate, ScheduleUpdate
-# Увери се, че имаш: from sqlalchemy import select, and_
+@router.patch("/groups/{group_id}", dependencies=[Depends(require_role("admin"))])
+async def update_group(group_id: int, payload: GroupUpdate, db: AsyncSession = Depends(get_async_session)):
+    group = await db.get(Group, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Групата не е намерена.")
+    
+    if payload.name: group.name = payload.name
+    if payload.year: group.year = payload.year
+    if payload.major: group.major = payload.major
+    
+    await db.commit()
+    return {"detail": "Данните за групата са обновени успешно."}
 
 @router.patch("/courses/{course_id}", dependencies=[Depends(require_role("admin"))])
 async def update_course(course_id: int, payload: CourseUpdate, db: AsyncSession = Depends(get_async_session)):
@@ -137,26 +148,33 @@ async def update_group_course(gc_id: int, payload: GroupCourseUpdate, db: AsyncS
     if not gc:
         raise HTTPException(status_code=404, detail="Връзката в учебния план не е намерена.")
 
-    if payload.teacher_id is not None:
-        if payload.teacher_id != 0: 
-            teacher = await db.get(Teacher, payload.teacher_id)
-            if not teacher:
-                raise HTTPException(status_code=404, detail="Новият преподавател не съществува.")
-            gc.teacher_id = payload.teacher_id
-        else:
-            gc.teacher_id = None
+    # Проверка за уникалност, ако се сменя група, предмет или тип
+    new_g = payload.group_id if payload.group_id else gc.group_id
+    new_c = payload.course_id if payload.course_id else gc.course_id
+    new_t = payload.type if payload.type else gc.type
 
-    if payload.type and payload.type != gc.type:
+    if any([payload.group_id, payload.course_id, payload.type]):
         stmt = select(GroupCourse).where(and_(
-            GroupCourse.group_id == gc.group_id,
-            GroupCourse.course_id == gc.course_id,
-            GroupCourse.type == payload.type,
+            GroupCourse.group_id == new_g,
+            GroupCourse.course_id == new_c,
+            GroupCourse.type == new_t,
             GroupCourse.id != gc.id  
         ))
         res = await db.execute(stmt)
         if res.scalar_one_or_none():
-            raise HTTPException(status_code=400, detail=f"Вече има създадено занятие тип '{payload.type}' за този предмет и група.")
-        gc.type = payload.type
+            raise HTTPException(status_code=400, detail=f"Вече има създадено такова занятие за този предмет и група.")
+        
+        gc.group_id = new_g
+        gc.course_id = new_c
+        gc.type = new_t
+
+    if payload.teacher_id is not None:
+        if payload.teacher_id != 0: 
+            teacher = await db.get(Teacher, payload.teacher_id)
+            if not teacher: raise HTTPException(status_code=404, detail="Новият преподавател не съществува.")
+            gc.teacher_id = payload.teacher_id
+        else:
+            gc.teacher_id = None
 
     if payload.semester is not None:
         gc.semester = payload.semester
@@ -214,17 +232,20 @@ async def update_schedule(schedule_id: int, payload: ScheduleUpdate, db: AsyncSe
     await db.commit()
     return {"detail": "Графикът е обновен успешно."}
 
-@router.get("/courses", response_model=List[CourseOut], dependencies=[Depends(require_role("admin"))])
+@router.get("/courses", response_model=List[CourseOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_courses(db: AsyncSession = Depends(get_async_session)):
     res = await db.execute(select(Course))
     return res.scalars().all()
 
-@router.get("/group-courses", response_model=List[GroupCourseOut], dependencies=[Depends(require_role("admin"))])
+@router.get("/group-courses", response_model=List[GroupCourseOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_group_courses(db: AsyncSession = Depends(get_async_session)):
     res = await db.execute(select(GroupCourse))
     return res.scalars().all()
 
-@router.get("/schedules", response_model=List[ScheduleOut], dependencies=[Depends(require_role("admin"))])
-async def get_schedules(db: AsyncSession = Depends(get_async_session)):
-    res = await db.execute(select(Schedule))
+@router.get("/schedules", response_model=List[ScheduleOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
+async def get_schedules(db: AsyncSession = Depends(get_async_session), current_user: User = Depends(get_current_user)):
+    stmt = select(Schedule).options(joinedload(Schedule.group_course))
+    if current_user.role == "teacher":
+        stmt = stmt.join(GroupCourse).where(GroupCourse.teacher_id == current_user.linked_teacher_id)
+    res = await db.execute(stmt)
     return res.scalars().all()
