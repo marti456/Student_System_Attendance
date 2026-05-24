@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select
 from models import AsyncSessionLocal, Student, Teacher, User, engine_url, Group
-from schemas import Token, TokenData
-from typing import Optional, Callable
+from schemas import GroupOut, StudentOut, StudentUpdate, TeacherOut, TeacherUpdate, Token, TokenData
+from typing import List, Optional, Callable
 from schemas import Token, TokenData, UserCreate, UserOut, StudentRegisterIn, TeacherRegisterIn, AdminRegisterIn
 
 # secret for signing tokens (change in production)
@@ -34,9 +34,9 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> O
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -184,7 +184,8 @@ async def register_teacher(payload: TeacherRegisterIn, db: AsyncSession = Depend
         # Първо създаваме преподавателя
         new_teacher = Teacher(
             name=payload.name,
-            department=payload.department
+            department=payload.department,
+            title=payload.title
         )
         db.add(new_teacher)
         await db.flush()
@@ -223,3 +224,78 @@ async def register_admin(payload: AdminRegisterIn, db: AsyncSession = Depends(ge
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Системна грешка при запис: {str(e)}")
+
+@router.patch("/students/{student_id}", dependencies=[Depends(require_role("admin"))])
+async def update_student(student_id: int, payload: StudentUpdate, db: AsyncSession = Depends(get_async_session)):
+    student = await db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+
+    if payload.faculty_number and payload.faculty_number != student.faculty_number:
+        res = await db.execute(select(Student).where(Student.faculty_number == payload.faculty_number))
+        if res.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Този факултетен номер вече съществува.")
+        student.faculty_number = payload.faculty_number
+
+    if payload.rfid_uid and payload.rfid_uid != student.rfid_uid:
+        res = await db.execute(select(Student).where(Student.rfid_uid == payload.rfid_uid))
+        if res.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Този RFID вече се използва от друг студент.")
+        student.rfid_uid = payload.rfid_uid
+
+    if payload.name:
+        student.name = payload.name
+
+    # Смяна на група
+    if any([payload.group_name, payload.group_year, payload.group_major]):
+        curr_group = await db.get(Group, student.group_id)
+        
+        new_g_name = payload.group_name if payload.group_name else curr_group.name
+        new_g_year = payload.group_year if payload.group_year else curr_group.year
+        new_g_major = payload.group_major.upper() if payload.group_major else curr_group.major
+        
+        res_group = await db.execute(select(Group).where(and_(
+            Group.name == new_g_name, Group.year == new_g_year, Group.major == new_g_major
+        )))
+        target_group = res_group.scalar_one_or_none()
+        
+        if not target_group:
+            target_group = Group(name=new_g_name, year=new_g_year, major=new_g_major)
+            db.add(target_group)
+            await db.flush()
+            
+        student.group_id = target_group.id
+
+    await db.commit()
+    return {"detail": "Данните на студента са обновени."}
+
+@router.patch("/teachers/{teacher_id}", dependencies=[Depends(require_role("admin"))])
+async def update_teacher(teacher_id: int, payload: TeacherUpdate, db: AsyncSession = Depends(get_async_session)):
+    teacher = await db.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Преподавателят не е намерен.")
+
+    if payload.name:
+        teacher.name = payload.name
+    if payload.title is not None: 
+        teacher.title = payload.title
+    if payload.department is not None:
+        teacher.department = payload.department
+
+    await db.commit()
+    return {"detail": "Данните на преподавателя са обновени."}
+
+@router.get("/groups", response_model=List[GroupOut], dependencies=[Depends(require_role("admin"))])
+async def get_groups(db: AsyncSession = Depends(get_async_session)):
+    res = await db.execute(select(Group))
+    return res.scalars().all()
+
+@router.get("/students", response_model=List[StudentOut], dependencies=[Depends(require_role("admin"))])
+async def get_students(db: AsyncSession = Depends(get_async_session)):
+    res = await db.execute(select(Student))
+    return res.scalars().all()
+
+@router.get("/teachers", response_model=List[TeacherOut], dependencies=[Depends(require_role("admin"))])
+async def get_teachers(db: AsyncSession = Depends(get_async_session)):
+    res = await db.execute(select(Teacher))
+    return res.scalars().all()

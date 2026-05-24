@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 import datetime
 
@@ -17,6 +17,7 @@ class TeacherRegisterIn(BaseModel):
     password: str
     name: str
     department: Optional[str] = None
+    title: Optional[str] = None
 
 class AdminRegisterIn(BaseModel):
     username: str
@@ -53,3 +54,110 @@ class AttendanceOut(BaseModel):
     schedule_id: int
     timestamp: datetime.datetime
     status: str
+    recorded_by: str
+
+class CourseCreate(BaseModel):
+    name: str = Field(..., max_length=150, description="Име на дисциплината")
+
+class GroupCourseCreate(BaseModel):
+    group_id: int
+    course_id: int
+    teacher_id: Optional[int] = None
+    type: str = Field("lecture", description="lecture, exercise, lab")
+    semester: Optional[int] = None
+
+class ScheduleCreate(BaseModel):
+    group_course_id: int
+    room_number: str = Field(..., max_length=20)
+    day_of_week: int = Field(..., ge=0, le=6, description="0 = Понеделник, 6 = Неделя")
+    start_time: datetime.time  # Очаква формат "HH:MM" или "HH:MM:SS"
+    end_time: datetime.time
+    week_parity: str = Field("all", description="all, odd, even")
+    start_date: datetime.date  # Очаква формат "YYYY-MM-DD"
+    end_date: datetime.date
+    subgroup: Optional[str] = Field(None, max_length=10, description="A, B или null")
+
+from pydantic import BaseModel, Field
+from typing import Optional
+import datetime
+
+# --- UPDATE СХЕМИ ЗА ПОТРЕБИТЕЛИ ---
+class StudentUpdate(BaseModel):
+    name: Optional[str] = None
+    faculty_number: Optional[str] = None
+    rfid_uid: Optional[str] = None
+    group_name: Optional[str] = None
+    group_year: Optional[int] = None
+    group_major: Optional[str] = None
+
+class TeacherUpdate(BaseModel):
+    name: Optional[str] = None
+    title: Optional[str] = None
+    department: Optional[str] = None
+
+class CourseUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=150)
+
+class GroupCourseUpdate(BaseModel):
+    teacher_id: Optional[int] = None
+    type: Optional[str] = None
+    semester: Optional[int] = None
+
+class ScheduleUpdate(BaseModel):
+    room_number: Optional[str] = Field(None, max_length=20)
+    day_of_week: Optional[int] = Field(None, ge=0, le=6)
+    start_time: Optional[datetime.time] = None
+    end_time: Optional[datetime.time] = None
+    week_parity: Optional[str] = None
+    start_date: Optional[datetime.date] = None
+    end_date: Optional[datetime.date] = None
+    subgroup: Optional[str] = Field(None, max_length=10)
+
+class GroupOut(BaseModel):
+    id: int
+    name: str
+    year: int
+    major: str
+    model_config = ConfigDict(from_attributes=True)
+
+class StudentOut(BaseModel):
+    student_id: int
+    name: str
+    faculty_number: str
+    rfid_uid: str
+    group_id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class TeacherOut(BaseModel):
+    id: int
+    name: str
+    title: Optional[str]
+    department: Optional[str]
+    model_config = ConfigDict(from_attributes=True)
+
+class CourseOut(BaseModel):
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+class GroupCourseOut(BaseModel):
+    id: int
+    group_id: int
+    course_id: int
+    teacher_id: Optional[int]
+    type: str
+    semester: Optional[int]
+    model_config = ConfigDict(from_attributes=True)
+
+class ScheduleOut(BaseModel):
+    id: int
+    group_course_id: int
+    room_number: str
+    day_of_week: int
+    start_time: datetime.time
+    end_time: datetime.time
+    week_parity: str
+    start_date: datetime.date
+    end_date: datetime.date
+    subgroup: Optional[str]
+    model_config = ConfigDict(from_attributes=True)

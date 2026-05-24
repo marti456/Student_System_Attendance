@@ -37,6 +37,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h4 id="welcomeMessage">Добре дошли</h4>
             <div>
+                <button id="showCurriculumBtn" class="btn btn-primary hidden" onclick="showCurriculum()">Учебен план</button>
                 <button id="showCreateUserBtn" class="btn btn-dark hidden me-2">Създай потребител</button>
                 <button id="logoutBtn" class="btn btn-outline-danger">Изход</button>
             </div>
@@ -58,10 +59,10 @@
                         <div class="col-auto">
                             <label>Статус</label>
                             <select id="addStatus" class="form-select">
-                                <option value="Присъствие">Присъствие</option>
-                                <option value="Отработване">Отработване</option>
-                                <option value="Извинено">Извинено</option>
-                            </select>
+                            <option value="present">Присъствие</option>
+                            <option value="makeup">Отработване</option>
+                            <option value="excused">Извинено</option>
+                        </select>
                         </div>
                         <div class="col-auto">
                             <button type="submit" class="btn btn-success">Добави ръчно</button>
@@ -73,15 +74,14 @@
             <div class="card">
                 <div class="card-header">Записи на присъствия</div>
                 <div class="card-body">
-                    <table class="table table-striped">
-                        <thead>
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
                             <tr>
-                                <th>ID</th>
-                                <th>Студент ID</th>
-                                <th>Разписание ID</th>
-                                <th>Време</th>
+                                <th>Дата и час</th>
+                                <th>Студент (ID)</th>
+                                <th>Занятие (ID)</th>
                                 <th>Статус</th>
-                                <th id="actionColumn" class="hidden">Действие</th>
+                                <th>Източник на записа</th> <th id="actionColumn" class="hidden">Действия</th>
                             </tr>
                         </thead>
                         <tbody id="attendanceTableBody">
@@ -151,9 +151,13 @@
                     </div>
 
                     <div id="clerkTeacherFields" class="row g-3 mt-1 p-0 m-0 hidden">
-                        <div class="col-md-12">
-                            <label class="text-success">Катедра / Департамент</label>
-                            <input type="text" id="clerkDepartment" class="form-control border-success" placeholder="напр. Компютърни системи и технологии">
+                        <div class="col-md-6">
+                            <label class="text-success">Академична длъжност</label>
+                            <input type="text" id="clerkTitle" class="form-control border-success" placeholder="напр. Доц. д-р">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-success">Катедра</label>
+                            <input type="text" id="clerkDepartment" class="form-control border-success" placeholder="напр. КСТ">
                         </div>
                     </div>
 
@@ -163,6 +167,132 @@
                 </form>
             </div>
         </div>
+        <div id="curriculumView" class="mb-4 hidden">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="mb-0">Управление на учебния план</h3>
+                <button onclick="showDashboard()" class="btn btn-outline-dark">Назад към присъствията</button>
+            </div>
+            
+            <div class="row mt-2">
+                <div class="col-md-4">
+                    <div class="card border-dark h-100">
+                        <div class="card-header bg-dark text-white fw-bold">1. Нов Предмет</div>
+                        <div class="card-body">
+                            <form id="createCourseForm">
+                                <div class="mb-2">
+                                    <label>Име на предмета</label>
+                                    <input type="text" id="courseName" class="form-control" placeholder="напр. Компютърни Мрежи" required>
+                                </div>
+                                <button type="submit" class="btn btn-dark w-100 btn-sm mt-2">Добави предмет</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card border-secondary h-100">
+                        <div class="card-header bg-secondary text-white fw-bold">2. Зачисляване към Група</div>
+                        <div class="card-body">
+                            <form id="createGroupCourseForm">
+                                <div class="mb-2">
+                                    <label>ID на Групата</label>
+                                    <input type="number" id="gcGroupId" class="form-control" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label>ID на Предмета</label>
+                                    <input type="number" id="gcCourseId" class="form-control" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label>ID на Преподавателя (Опционално)</label>
+                                    <input type="number" id="gcTeacherId" class="form-control">
+                                </div>
+                                <div class="mb-2">
+                                    <label>Тип занятие</label>
+                                    <select id="gcType" class="form-select">
+                                        <option value="lecture">Лекция</option>
+                                        <option value="exercise">Упражнение</option>
+                                        <option value="lab">Лабораторно упражнение</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-secondary w-100 btn-sm mt-2">Зачисли предмет</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card border-primary h-100">
+                        <div class="card-header bg-primary text-white fw-bold">3. Добавяне в Графика</div>
+                        <div class="card-body">
+                            <form id="createScheduleForm">
+                                <div class="row g-2">
+                                    <div class="col-md-6 mb-2">
+                                        <label>GroupCourse ID</label>
+                                        <input type="number" id="schedGcId" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label>Зала номер</label>
+                                        <input type="text" id="schedRoom" class="form-control" placeholder="напр. 3225" required>
+                                    </div>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-6 mb-2">
+                                        <label>Ден</label>
+                                        <select id="schedDay" class="form-select">
+                                            <option value="0">Понеделник</option>
+                                            <option value="1">Вторник</option>
+                                            <option value="2">Сряда</option>
+                                            <option value="3">Четвъртък</option>
+                                            <option value="4">Петък</option>
+                                            <option value="5">Събота</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label>Подгрупа</label>
+                                        <select id="schedSubgroup" class="form-select">
+                                            <option value="">Цялата (Лекция)</option>
+                                            <option value="A">Подгрупа А</option>
+                                            <option value="B">Подгрупа Б</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-6 mb-2">
+                                        <label>Начало</label>
+                                        <input type="time" id="schedStartTime" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label>Край</label>
+                                        <input type="time" id="schedEndTime" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label>Цикличност</label>
+                                    <select id="schedParity" class="form-select">
+                                        <option value="all">Всяка седмица</option>
+                                        <option value="odd">През седмица - Нечетна</option>
+                                        <option value="even">През седмица - Четна</option>
+                                    </select>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-6 mb-2">
+                                        <label>От дата</label>
+                                        <input type="date" id="schedStartDate" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label>До дата</label>
+                                        <input type="date" id="schedEndDate" class="form-control" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 btn-sm mt-2">Запиши в графика</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
     </div>
 </div>
 
@@ -196,6 +326,7 @@
                 }
                 if (userRole === 'admin') {
                     document.getElementById('showCreateUserBtn').classList.remove('hidden');
+                    document.getElementById('showCurriculumBtn').classList.remove('hidden');
                 }
                 loadAttendance();
             } else {
@@ -233,35 +364,52 @@
 
     // Извличане на присъствията
     async function loadAttendance() {
-        try {
-            const response = await fetch(`${API_BASE}/attendance`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            const tbody = document.getElementById('attendanceTableBody');
-            tbody.innerHTML = '';
+    try {
+        const response = await fetch(`${API_BASE}/attendance`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        const tbody = document.getElementById('attendanceTableBody');
+        tbody.innerHTML = ''; // Изчистваме старите редове
 
-            data.forEach(att => {
-                const tr = document.createElement('tr');
-                let deleteBtnHtml = '';
-                if (userRole === 'teacher' || userRole === 'admin') {
-                    deleteBtnHtml = `<td><button onclick="deleteAttendance(${att.id})" class="btn btn-sm btn-danger">Изтрий</button></td>`;
-                }
-                
-                tr.innerHTML = `
-                    <td>${att.id}</td>
-                    <td>${att.student_id}</td>
-                    <td>${att.schedule_id}</td>
-                    <td>${new Date(att.timestamp).toLocaleString('bg-BG')}</td>
-                    <td><span class="badge bg-info">${att.status}</span></td>
-                    ${deleteBtnHtml}
-                `;
-                tbody.appendChild(tr);
-            });
-        } catch (err) {
-            console.error("Грешка при зареждане на данните", err);
-        }
+        data.forEach(att => {
+            const tr = document.createElement('tr');
+            let statusBadge = '';
+            if (att.status === 'present') {
+                statusBadge = '<span class="badge bg-success">Присъствие</span>';
+            } else if (att.status === 'makeup') {
+                statusBadge = '<span class="badge bg-warning text-dark">Отработване</span>';
+            } else if (att.status === 'excused') {
+                statusBadge = '<span class="badge bg-info text-dark">Служебно / Извинено</span>';
+            } else {
+                statusBadge = `<span class="badge bg-secondary">${att.status}</span>`;
+            }
+
+            let sourceMark = '';
+            if (att.recorded_by === 'Автоматичен') {
+                sourceMark = '<strong class="text-primary">🤖 Автоматичен (RFID)</strong>';
+            } else {
+                sourceMark = `<span class="text-muted">✍️ Ръчно от: <strong>${att.recorded_by}</strong></span>`;
+            }
+
+            const formattedDate = new Date(att.timestamp).toLocaleString('bg-BG');
+
+            tr.innerHTML = `
+                <td>${formattedDate}</td>
+                <td>${att.student_id}</td>
+                <td>${att.schedule_id}</td>
+                <td>${statusBadge}</td>
+                <td>${sourceMark}</td> <td class="${userRole === 'teacher' ? '' : 'hidden'}">
+                    <button class="btn btn-sm btn-danger" onclick="deleteRecord(${att.id})">Изтрий</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error("Грешка при зареждане на присъствията:", err);
     }
+}
 
     // Ръчно добавяне на присъствие
     document.getElementById('addAttendanceForm').addEventListener('submit', async (e) => {
@@ -409,6 +557,7 @@
         } else if (selectedRole === 'teacher') {
             url = `${API_BASE}/auth/register/teacher`;
             bodyData.name = document.getElementById('clerkName').value;
+            bodyData.title = document.getElementById('clerkTitle').value || null; // Взимаме титлата
             bodyData.department = document.getElementById('clerkDepartment').value || null;
             if (!bodyData.name) {
                 alert("Моля, въведете три имена на преподавателя!");
@@ -444,7 +593,99 @@
             console.error("Възникна грешка при комуникацията:", err);
         }
     });
+
+    document.getElementById('createGroupCourseForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const bodyData = {
+            group_id: parseInt(document.getElementById('gcGroupId').value),
+            course_id: parseInt(document.getElementById('gcCourseId').value),
+            teacher_id: document.getElementById('gcTeacherId').value ? parseInt(document.getElementById('gcTeacherId').value) : null,
+            type: document.getElementById('gcType').value
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/admin/group-courses`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify(bodyData)
+            });
+            const result = await response.json();
+            alert(response.ok ? result.detail : `Грешка: ${result.detail}`);
+            if(response.ok) document.getElementById('createGroupCourseForm').reset();
+        } catch (err) {
+            console.error(err);
+        }
+    });
+    document.getElementById('createScheduleForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+            const bodyData = {
+            group_course_id: parseInt(document.getElementById('schedGcId').value),
+            room_number: document.getElementById('schedRoom').value,
+            day_of_week: parseInt(document.getElementById('schedDay').value),
+            start_time: document.getElementById('schedStartTime').value,
+            end_time: document.getElementById('schedEndTime').value,
+            week_parity: document.getElementById('schedParity').value,
+            start_date: document.getElementById('schedStartDate').value,
+            end_date: document.getElementById('schedEndDate').value,
+            subgroup: document.getElementById('schedSubgroup').value || null
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/admin/schedules`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify(bodyData)
+            });
+            const result = await response.json();
+            alert(response.ok ? result.detail : `Грешка: ${result.detail}`);
+            if(response.ok) document.getElementById('createScheduleForm').reset();
+        } catch (err) {
+            console.error(err);
+        }
+    });
+    document.getElementById('createCourseForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+            const bodyData = {
+            name: document.getElementById('courseName').value
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/admin/courses`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify(bodyData)
+            });
+            const result = await response.json();
+            alert(response.ok ? result.detail : `Грешка: ${result.detail}`);
+            if(response.ok) document.getElementById('createCourseForm').reset();
+        } catch (err) {
+            console.error(err);
+        }
+    });
     
+    function showCurriculum() {
+        document.getElementById('attendanceView').classList.add('hidden');
+        document.getElementById('curriculumView').classList.remove('hidden');
+    }
+
+    // За да работи бутонът "Назад към присъствията"
+    function showDashboard() {
+        document.getElementById('curriculumView').classList.add('hidden');
+        document.getElementById('createUserView').classList.add('hidden');
+        document.getElementById('attendanceView').classList.remove('hidden');
+        loadAttendance();
+    }
+
     // Изход
     document.getElementById('logoutBtn').addEventListener('click', logout);
     function logout() {
@@ -459,6 +700,7 @@
         document.getElementById('actionColumn')?.classList.add('hidden');
         document.getElementById('createUserView')?.classList.add('hidden');
         document.getElementById('attendanceView')?.classList.remove('hidden');
+        document.getElementById('showCurriculumBtn')?.classList.add('hidden');
     }
 
     // Инициализация
