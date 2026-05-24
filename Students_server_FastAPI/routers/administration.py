@@ -28,7 +28,7 @@ async def link_group_course(payload: GroupCourseCreate, db: AsyncSession = Depen
     # Валидация дали съществуват групата и курса
     group = await db.get(Group, payload.group_id)
     if not group:
-        raise HTTPException(status_code=44, detail="Групата не е намерена.")
+        raise HTTPException(status_code=404, detail="Групата не е намерена.")
         
     course = await db.get(Course, payload.course_id)
     if not course:
@@ -85,7 +85,7 @@ async def create_schedule_slot(payload: ScheduleCreate, db: AsyncSession = Depen
             Schedule.group_course_id == payload.group_course_id,
             Schedule.day_of_week == payload.day_of_week,
             Schedule.start_time == payload.start_time,
-            Schedule.week_parity == payload.week_parity,
+            Schedule.is_biweekly == payload.is_biweekly,
             Schedule.subgroup == payload.subgroup
         )
     )
@@ -99,7 +99,7 @@ async def create_schedule_slot(payload: ScheduleCreate, db: AsyncSession = Depen
         day_of_week=payload.day_of_week,
         start_time=payload.start_time,
         end_time=payload.end_time,
-        week_parity=payload.week_parity,
+        is_biweekly=payload.is_biweekly,
         start_date=payload.start_date,
         end_date=payload.end_date,
         subgroup=payload.subgroup
@@ -191,8 +191,7 @@ async def update_schedule(schedule_id: int, payload: ScheduleUpdate, db: AsyncSe
     new_day = payload.day_of_week if payload.day_of_week is not None else sched.day_of_week
     new_start = payload.start_time if payload.start_time is not None else sched.start_time
     new_end = payload.end_time if payload.end_time is not None else sched.end_time
-    new_parity = payload.week_parity if payload.week_parity is not None else sched.week_parity
-    
+    new_is_biweekly = payload.is_biweekly if payload.is_biweekly is not None else sched.is_biweekly
     if payload.subgroup is not None:
         new_subgroup = payload.subgroup if payload.subgroup != "" else None
     else:
@@ -202,13 +201,13 @@ async def update_schedule(schedule_id: int, payload: ScheduleUpdate, db: AsyncSe
         raise HTTPException(status_code=400, detail="Началният час трябва да е преди крайния.")
 
     if any([payload.day_of_week is not None, payload.start_time is not None, 
-            payload.week_parity is not None, payload.subgroup is not None]):
+            payload.is_biweekly is not None, payload.subgroup is not None]):
         
         stmt = select(Schedule).where(and_(
             Schedule.group_course_id == sched.group_course_id,
             Schedule.day_of_week == new_day,
             Schedule.start_time == new_start,
-            Schedule.week_parity == new_parity,
+            Schedule.is_biweekly == new_is_biweekly,
             Schedule.subgroup == new_subgroup,
             Schedule.id != sched.id 
         ))
@@ -220,7 +219,7 @@ async def update_schedule(schedule_id: int, payload: ScheduleUpdate, db: AsyncSe
     sched.day_of_week = new_day
     sched.start_time = new_start
     sched.end_time = new_end
-    sched.week_parity = new_parity
+    sched.is_biweekly = new_is_biweekly
     sched.subgroup = new_subgroup
 
     if payload.start_date: sched.start_date = payload.start_date

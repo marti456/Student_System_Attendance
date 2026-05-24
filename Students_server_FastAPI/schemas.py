@@ -73,7 +73,7 @@ class ScheduleCreate(BaseModel):
     day_of_week: int = Field(..., ge=0, le=6, description="0 = Понеделник, 6 = Неделя")
     start_time: datetime.time  # Очаква формат "HH:MM" или "HH:MM:SS"
     end_time: datetime.time
-    week_parity: str = Field("all", description="all, odd, even")
+    is_biweekly: bool = Field(False, description="False = всяка седмица, True = през седмица")
     start_date: datetime.date  # Очаква формат "YYYY-MM-DD"
     end_date: datetime.date
     subgroup: Optional[str] = Field(None, max_length=10, description="A, B или null")
@@ -99,17 +99,17 @@ class TeacherUpdate(BaseModel):
 class CourseUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=150)
 
-class GroupCourseUpdate(BaseModel):
-    teacher_id: Optional[int] = None
-    type: Optional[str] = None
-    semester: Optional[int] = None
+# class GroupCourseUpdate(BaseModel):
+#     teacher_id: Optional[int] = None
+#     type: Optional[str] = None
+#     semester: Optional[int] = None
 
 class ScheduleUpdate(BaseModel):
     room_number: Optional[str] = Field(None, max_length=20)
     day_of_week: Optional[int] = Field(None, ge=0, le=6)
     start_time: Optional[datetime.time] = None
     end_time: Optional[datetime.time] = None
-    week_parity: Optional[str] = None
+    is_biweekly: Optional[bool] = None
     start_date: Optional[datetime.date] = None
     end_date: Optional[datetime.date] = None
     subgroup: Optional[str] = Field(None, max_length=10)
@@ -157,7 +157,7 @@ class ScheduleOut(BaseModel):
     day_of_week: int
     start_time: datetime.time
     end_time: datetime.time
-    week_parity: str
+    is_biweekly: bool
     start_date: datetime.date
     end_date: datetime.date
     subgroup: Optional[str]

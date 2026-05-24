@@ -1,7 +1,7 @@
 import enum
 
 from sqlalchemy import (
-    CheckConstraint, Column, Date, Index, Integer, String, ForeignKey, Time, UniqueConstraint, DateTime, Text
+    Boolean, CheckConstraint, Column, Date, Index, Integer, String, ForeignKey, Time, UniqueConstraint, DateTime, Text
 )
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -102,7 +102,7 @@ class Schedule(Base):
     day_of_week = Column(Integer, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
-    week_parity = Column(String(10), nullable=False, default="all")   # SQLite-friendly
+    is_biweekly = Column(Boolean, nullable=False, default=False)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
     subgroup = Column(String(10), nullable=True)
@@ -110,7 +110,7 @@ class Schedule(Base):
     __table_args__ = (
         CheckConstraint("day_of_week BETWEEN 0 AND 6", name="ck_day_of_week"),
         CheckConstraint("start_time < end_time", name="ck_time_order"),
-        UniqueConstraint("group_course_id", "day_of_week", "start_time", "week_parity", "subgroup",
+        UniqueConstraint("group_course_id", "day_of_week", "start_time", "is_biweekly", "subgroup",
                          name="uq_schedule_slot"),
     )
 

@@ -11,23 +11,30 @@ from auth import get_current_user, require_role, require_any_role, get_async_ses
 
 router = APIRouter()
 
-def get_cycle_window(now_date: datetime.date, schedule_start_date: datetime.date, is_biweekly: bool):
-    # Колко дни са минали от първото реално занятие за този предмет
-    delta = now_date - schedule_start_date
-    days_since_start = max(0, delta.days) 
+# def get_cycle_window(now_date: datetime.date, schedule_start_date: datetime.date, is_biweekly: bool):
+#     # Колко дни са минали от първото реално занятие за този предмет
+#     now_monday = now_date - datetime.timedelta(days=now_date.weekday())
     
-    if is_biweekly:
-        # 14-дневен цикъл
-        cycle_index = days_since_start // 14
-        cycle_start = schedule_start_date + datetime.timedelta(days=cycle_index * 14)
-        cycle_end = cycle_start + datetime.timedelta(days=14)
-    else:
-        # 7-дневен цикъл
-        cycle_index = days_since_start // 7
-        cycle_start = schedule_start_date + datetime.timedelta(days=cycle_index * 7)
-        cycle_end = cycle_start + datetime.timedelta(days=7)
+#     if is_biweekly:
+#         # За предмети през седмица (било то четна или нечетна), 
+#         # "прозорецът" винаги е текущият 14-дневен период.
+#         # За да сме сигурни, че Група А (Нечетна) и Група Б (Четна)
+#         # попадат в ЕДИН И СЪЩ 14-дневен блок, ни трябва "Епоха".
+#         # Използваме фиксирана дата за начало (напр. 1 септември на текущата година).
         
-    return cycle_start, cycle_end
+#         epoch = datetime.date(now_date.year, 9, 1)
+#         epoch_monday = epoch - datetime.timedelta(days=epoch.weekday())
+        
+#         weeks_since_epoch = (now_monday - epoch_monday).days // 7
+#         cycle_index = weeks_since_epoch // 2
+        
+#         cycle_start = epoch_monday + datetime.timedelta(days=cycle_index * 14)
+#         cycle_end = cycle_start + datetime.timedelta(days=14)
+#     else:
+#         cycle_start = now_monday
+#         cycle_end = now_monday + datetime.timedelta(days=7)
+        
+#     return cycle_start, cycle_end
 
 # Helper: find current schedule by room and current time
 # def _time_matches(slot_start: str, slot_end: str, now_time: datetime.time) -> bool:
@@ -36,57 +43,112 @@ def get_cycle_window(now_date: datetime.date, schedule_start_date: datetime.date
 #     return start <= now_time <= end
 
 @router.post("/checkin")
-async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_session), api_key: str = None):
-    # Note: for ESP32 protect with API key or use device JWT. Here it's open — add protection!
+async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_session)):
     # 1. Намиране на студента по RFID
-    res = await db.execute(select(Student).where(Student.rfid_uid == payload.rfid_uid))
-    student = res.scalar_one_or_none()
+    res_student = await db.execute(select(Student).where(Student.rfid_uid == payload.rfid_uid))
+    student = res_student.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Невалиден RFID")
 
     now = datetime.datetime.now()
     now_date = now.date()
     now_time = now.time()
-    now_weekday = now.weekday() # 0 = Понеделник, 6 = Неделя
-    # 2. Намираме кое разписание тече в момента в тази зала
-    res_sched = await db.execute(
+    
+    # 2. Намиране на график за залата в този ден
+    # Търсим само занятия, които са активни според датата и часа
+    stmt = (
         select(Schedule)
         .options(joinedload(Schedule.group_course))
         .where(
             and_(
                 Schedule.room_number == payload.room_number,
-                Schedule.day_of_week == now_weekday
+                Schedule.day_of_week == now_date.weekday(),
+                Schedule.start_date <= now_date,
+                Schedule.end_date >= now_date,
+                Schedule.start_time <= now_time,
+                Schedule.end_time > now_time
             )
         )
     )
+    res_sched = await db.execute(stmt)
     schedules = res_sched.scalars().all()
     
     matched_schedule = None
+    guest_schedule = None
+    # 3. Филтриране за четност на седмицата
     for sched in schedules:
-        if sched.start_time <= now_time <= sched.end_time:
-            matched_schedule = sched
+        if sched.is_biweekly:
+            # Изчисляваме седмиците от началото на конкретния курс
+            weeks_delta = (now_date - sched.start_date).days // 7
+            # Ако искаме да отчитаме само в седмиците, които са четни спрямо старта (0, 2, 4...)
+            if weeks_delta % 2 != 0: 
+                continue
+        
+        if sched.group_course.group_id == student.group_id:
+            matched_schedule = sched  # собствената група има приоритет
             break
+        elif guest_schedule is None:
+            guest_schedule = sched 
+        # matched_schedule = sched
+        # break
             
-    if not matched_schedule:
-        raise HTTPException(status_code=404, detail="В момента няма активно занятие в тази зала.")
-    
-    # 3. ЗАЩИТА: Дали сме в активния период на този конкретен курс?
-    if not (matched_schedule.start_date <= now_date <= matched_schedule.end_date):
-        raise HTTPException(
-            status_code=403, 
-            detail="Този курс не е активен в момента (извън зададените дати)."
+    if guest_schedule and not matched_schedule:
+        # Проверка: дали групата на студента изобщо изучава този предмет+тип
+        stmt_valid = select(GroupCourse).where(
+            and_(
+                GroupCourse.group_id == student.group_id,
+                GroupCourse.course_id == guest_schedule.group_course.course_id,
+                GroupCourse.type == guest_schedule.group_course.type
+            )
         )
+        res_valid = await db.execute(stmt_valid)
+        if not res_valid.scalar_one_or_none():
+            raise HTTPException(
+                status_code=403,
+                detail="Нямате това занятие в учебния си план."
+            )
+        matched_schedule = guest_schedule
+    if not matched_schedule:
+        raise HTTPException(status_code=404, detail="В момента няма активно занятие.")
     
-    # 4. Изчисляваме времевия прозорец за този урок (Academic Cycle)
-    is_biweekly = matched_schedule.week_parity.value in ['even', 'odd']
-    cycle_start, cycle_end = get_cycle_window(now_date, matched_schedule.start_date, is_biweekly)
+    # 4. Изчисляване на учебния цикъл
+    # Студентът не може да има присъствие за СЪЩИЯ предмет и ТИП занятие днес
+    if matched_schedule.is_biweekly:
+    # Намираме start_date на собствения график на студента за този предмет+тип,
+    # за да имаме консистентна референтна точка независимо дали е гост или не
+        own_sched_stmt = (
+            select(Schedule)
+            .join(GroupCourse, Schedule.group_course_id == GroupCourse.id)
+            .where(
+                and_(
+                    GroupCourse.group_id == student.group_id,
+                    GroupCourse.course_id == matched_schedule.group_course.course_id,
+                    GroupCourse.type == matched_schedule.group_course.type,
+                    Schedule.is_biweekly == True
+                )
+            )
+            .order_by(Schedule.start_date.asc())  # ← ДОБАВЯШ ТОВА
+            .limit(1)
+        )
+        own_sched_res = await db.execute(own_sched_stmt)
+        own_sched = own_sched_res.scalar_one_or_none()
+        
+        # Ако намерим собствен график - използваме неговия start_date като референция
+        # Ако не - fallback към matched (не би трябвало да се случи след валидацията)
+        ref_date = own_sched.start_date if own_sched else matched_schedule.start_date
+        
+        weeks_delta = (now_date - ref_date).days // 7
+        cycle_start = ref_date + datetime.timedelta(weeks=(weeks_delta // 2) * 2)
+        cycle_end = cycle_start + datetime.timedelta(days=14)
+    else:
+        cycle_start = now_date - datetime.timedelta(days=now_date.weekday())
+        cycle_end = cycle_start + datetime.timedelta(days=7)
 
-    # Преобразуваме датите обратно в datetime за заявката към базата данни
     cycle_start_dt = datetime.datetime.combine(cycle_start, datetime.time.min)
     cycle_end_dt = datetime.datetime.combine(cycle_end, datetime.time.min)
 
-    # 5. Проверяваме дали студентът вече има присъствие в ТОЗИ времеви прозорец за ТОЗИ предмет
-    stmt = (
+    # Проверка: студентът вече ли е присъствал на този предмет+тип в рамките на цикъла?
+    stmt_dup = (
         select(Attendance)
         .join(Schedule, Attendance.schedule_id == Schedule.id)
         .join(GroupCourse, Schedule.group_course_id == GroupCourse.id)
@@ -94,28 +156,22 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
             and_(
                 Attendance.student_id == student.student_id,
                 GroupCourse.course_id == matched_schedule.group_course.course_id,
+                GroupCourse.type == matched_schedule.group_course.type,
                 Attendance.timestamp >= cycle_start_dt,
                 Attendance.timestamp < cycle_end_dt
             )
         )
     )
-    res_cycle_att = await db.execute(stmt)
-    already_attended_in_cycle = res_cycle_att.scalars().first()
+    res_att = await db.execute(stmt_dup)
+    if res_att.scalars().first():
+        raise HTTPException(
+            status_code=403, 
+            detail="Вече сте се отчели за този предмет в текущия учебен цикъл."
+        )
 
-    # 6. Вземане на финално решение за статуса
-    if already_attended_in_cycle:
-        # Вече си е взел урока за този цикъл (напр. идва в четна и нечетна седмица едновременно)
-        raise HTTPException(status_code=403, detail="Student not enrolled for this course")
-    else:
-        # Това му е първо идване за този учебен прозорец
-        if student.group_id == matched_schedule.group_course.group_id:
-            # Идва си със своята главна група
-            status_text = "Присъствие"
-        else:
-            # Идва с чужда група (нормално отработване)
-            status_text = "Отработване"
-
-    # 7. Записване в базата
+    # 5. Регистрация (Присъствие за групата, Отработване за гости)
+    status_text = "Присъствие" if student.group_id == matched_schedule.group_course.group_id else "Отработване"
+    
     att = Attendance(
         student_id=student.student_id, 
         schedule_id=matched_schedule.id, 
@@ -123,15 +179,110 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
         status=status_text,
         recorded_by="Автоматичен"
     )
-    db.add(att)
     
+    db.add(att)
     try:
         await db.commit()
     except Exception:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="Възникна грешка при запис на присъствието.")
+        raise HTTPException(status_code=400, detail="Грешка при запис.")
     
-    return {"detail": f"Успешно регистрирано: {status_text}", "status": status_text}
+    return {"detail": f"Успешно: {status_text}", "status": status_text}
+    # # Note: for ESP32 protect with API key or use device JWT. Here it's open — add protection!
+    # # 1. Намиране на студента по RFID
+    # res = await db.execute(select(Student).where(Student.rfid_uid == payload.rfid_uid))
+    # student = res.scalar_one_or_none()
+    # if not student:
+    #     raise HTTPException(status_code=404, detail="Невалиден RFID")
+
+    # now = datetime.datetime.now()
+    # now_date = now.date()
+    # now_time = now.time()
+    # now_weekday = now.weekday() # 0 = Понеделник, 6 = Неделя
+    # # 2. Намираме кое разписание тече в момента в тази зала
+    # res_sched = await db.execute(
+    #     select(Schedule)
+    #     .options(joinedload(Schedule.group_course))
+    #     .where(
+    #         and_(
+    #             Schedule.room_number == payload.room_number,
+    #             Schedule.day_of_week == now_weekday
+    #         )
+    #     )
+    # )
+    # schedules = res_sched.scalars().all()
+    
+    # matched_schedule = None
+    # for sched in schedules:
+    #     if sched.start_time <= now_time <= sched.end_time:
+    #         matched_schedule = sched
+    #         break
+            
+    # if not matched_schedule:
+    #     raise HTTPException(status_code=404, detail="В момента няма активно занятие в тази зала.")
+    
+    # # 3. ЗАЩИТА: Дали сме в активния период на този конкретен курс?
+    # if not (matched_schedule.start_date <= now_date <= matched_schedule.end_date):
+    #     raise HTTPException(
+    #         status_code=403, 
+    #         detail="Този курс не е активен в момента (извън зададените дати)."
+    #     )
+    
+    # # 4. Изчисляваме времевия прозорец за този урок (Academic Cycle)
+    # is_biweekly = matched_schedule.week_parity.value in ['even', 'odd']
+    # cycle_start, cycle_end = get_cycle_window(now_date, matched_schedule.start_date, is_biweekly)
+
+    # # Преобразуваме датите обратно в datetime за заявката към базата данни
+    # cycle_start_dt = datetime.datetime.combine(cycle_start, datetime.time.min)
+    # cycle_end_dt = datetime.datetime.combine(cycle_end, datetime.time.min)
+
+    # # 5. Проверяваме дали студентът вече има присъствие в ТОЗИ времеви прозорец за ТОЗИ предмет
+    # stmt = (
+    #     select(Attendance)
+    #     .join(Schedule, Attendance.schedule_id == Schedule.id)
+    #     .join(GroupCourse, Schedule.group_course_id == GroupCourse.id)
+    #     .where(
+    #         and_(
+    #             Attendance.student_id == student.student_id,
+    #             GroupCourse.course_id == matched_schedule.group_course.course_id,
+    #             Attendance.timestamp >= cycle_start_dt,
+    #             Attendance.timestamp < cycle_end_dt
+    #         )
+    #     )
+    # )
+    # res_cycle_att = await db.execute(stmt)
+    # already_attended_in_cycle = res_cycle_att.scalars().first()
+
+    # # 6. Вземане на финално решение за статуса
+    # if already_attended_in_cycle:
+    #     # Вече си е взел урока за този цикъл (напр. идва в четна и нечетна седмица едновременно)
+    #     raise HTTPException(status_code=403, detail="Student not enrolled for this course")
+    # else:
+    #     # Това му е първо идване за този учебен прозорец
+    #     if student.group_id == matched_schedule.group_course.group_id:
+    #         # Идва си със своята главна група
+    #         status_text = "Присъствие"
+    #     else:
+    #         # Идва с чужда група (нормално отработване)
+    #         status_text = "Отработване"
+
+    # # 7. Записване в базата
+    # att = Attendance(
+    #     student_id=student.student_id, 
+    #     schedule_id=matched_schedule.id, 
+    #     timestamp=now, 
+    #     status=status_text,
+    #     recorded_by="Автоматичен"
+    # )
+    # db.add(att)
+    
+    # try:
+    #     await db.commit()
+    # except Exception:
+    #     await db.rollback()
+    #     raise HTTPException(status_code=400, detail="Възникна грешка при запис на присъствието.")
+    
+    # return {"detail": f"Успешно регистрирано: {status_text}", "status": status_text}
 
 # GET attendance - students see only their own
 @router.get("/attendance", response_model=PaginatedAttendanceOut)

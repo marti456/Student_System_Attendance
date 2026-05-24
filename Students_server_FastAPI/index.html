@@ -1,492 +1,772 @@
 <!DOCTYPE html>
 <html lang="bg">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Система за Присъствия</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .hidden { display: none !important; }
-        body { background-color: #f8f9fa; padding-top: 20px; padding-bottom: 50px; }
-        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .table-responsive { max-height: 400px; overflow-y: auto; }
+        .hidden {
+            display: none !important;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+            padding-bottom: 50px;
+        }
+
+        .card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .table-responsive {
+            max-height: 400px;
+            overflow-y: auto;
+        }
     </style>
 </head>
+
 <body>
 
-<div class="container-fluid" style="max-width: 1400px;">
-    <h2 class="text-center mb-4 text-dark fw-bold">IoT Система за Университетски Присъствия</h2>
+    <div class="container-fluid" style="max-width: 1400px;">
+        <h2 class="text-center mb-4 text-dark fw-bold">IoT Система за Университетски Присъствия</h2>
 
-    <div id="loginSection" class="card mx-auto" style="max-width: 400px;">
-        <div class="card-body">
-            <h5 class="card-title text-center fw-bold mb-3">Вход в системата</h5>
-            <form id="loginForm">
-                <div class="mb-3">
-                    <label class="form-label">Потребителско име</label>
-                    <input type="text" id="username" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Парола</label>
-                    <input type="password" id="password" class="form-control" required>
-                </div>
-                <button type="submit" class="btn btn-primary w-100 fw-bold">Влез</button>
-                <div id="loginError" class="text-danger mt-2 text-center hidden">Грешни потребителски данни!</div>
-            </form>
-        </div>
-    </div>
-
-    <div id="dashboardSection" class="hidden">
-        <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded shadow-sm border">
-            <h5 id="welcomeMessage" class="mb-0 fw-bold text-secondary">Добре дошли</h5>
-            <div>
-                <button id="showCurriculumBtn" class="btn btn-primary btn-sm hidden" onclick="navigate('curriculumView')">📚 Учебен план и График</button>
-                <button id="showCreateUserBtn" class="btn btn-dark btn-sm hidden me-2" onclick="navigate('createUserView')">👥 Потребители, Лица и Групи</button>
-                <button id="logoutBtn" class="btn btn-outline-danger btn-sm fw-bold">🚪 Изход</button>
+        <div id="loginSection" class="card mx-auto" style="max-width: 400px;">
+            <div class="card-body">
+                <h5 class="card-title text-center fw-bold mb-3">Вход в системата</h5>
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label class="form-label">Потребителско име</label>
+                        <input type="text" id="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Парола</label>
+                        <input type="password" id="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Влез</button>
+                    <div id="loginError" class="text-danger mt-2 text-center hidden">Грешни потребителски данни!</div>
+                </form>
             </div>
         </div>
 
-        <div id="attendanceView" class="view-panel">
-            <div id="teacherControls" class="card border-success hidden">
-                <div class="card-header bg-success text-white fw-bold">✍️ Ръчно отчитане на посещение</div>
-                <div class="card-body">
-                    <form id="addAttendanceForm" class="row g-3 align-items-end">
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted">Филтър Група</label>
-                            <select id="filterAttGroup" class="form-select form-select-sm"><option value="" selected>-- Всички --</option></select>
+        <div id="dashboardSection" class="hidden">
+            <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded shadow-sm border">
+                <h5 id="welcomeMessage" class="mb-0 fw-bold text-secondary">Добре дошли</h5>
+                <div>
+                    <button id="showCurriculumBtn" class="btn btn-primary btn-sm hidden"
+                        onclick="navigate('curriculumView')">📚 Учебен план и График</button>
+                    <button id="showCreateUserBtn" class="btn btn-dark btn-sm hidden me-2"
+                        onclick="navigate('createUserView')">👥 Потребители, Лица и Групи</button>
+                    <button id="logoutBtn" class="btn btn-outline-danger btn-sm fw-bold">🚪 Изход</button>
+                </div>
+            </div>
+
+            <div id="attendanceView" class="view-panel">
+                <div id="teacherControls" class="card border-success hidden">
+                    <div class="card-header bg-success text-white fw-bold">✍️ Ръчно отчитане на посещение</div>
+                    <div class="card-body">
+                        <form id="addAttendanceForm" class="row g-3 align-items-end">
+                            <div class="col-md-2">
+                                <label class="small fw-bold text-muted">Филтър Група</label>
+                                <select id="filterAttGroup" class="form-select form-select-sm">
+                                    <option value="" selected>-- Всички --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted">Студент</label>
+                                <select id="addStudentId" class="form-select form-select-sm" required>
+                                    <option value="" disabled selected>Зареждане...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted">Дисциплина и Час</label>
+                                <select id="addScheduleId" class="form-select form-select-sm" required>
+                                    <option value="" disabled selected>Зареждане...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold text-muted">Дата на провеждане</label>
+                                <input type="date" id="addDate" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-md-1">
+                                <label class="small fw-bold text-muted">Статус</label>
+                                <select id="addStatus" class="form-select form-select-sm">
+                                    <option value="present">Присъствие</option>
+                                    <option value="makeup">Отработване</option>
+                                    <option value="excused">Извинено</option>
+                                </select>
+                            </div>
+                            <div class="col-md-1"><button type="submit"
+                                    class="btn btn-success btn-sm w-100 fw-bold">Запиши</button></div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card border-dark">
+                    <div
+                        class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                        <span>📋 Дневен журнал на посещенията</span>
+                        <div class="d-flex gap-2">
+                            <input type="text" id="searchAttInput" class="form-control form-control-sm"
+                                placeholder="🔍 Търси Име или ФН..." style="width: 250px;">
                         </div>
-                        <div class="col-md-3">
-                            <label class="small fw-bold text-muted">Студент</label>
-                            <select id="addStudentId" class="form-select form-select-sm" required><option value="" disabled selected>Зареждане...</option></select>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="min-height: 300px;">
+                            <table class="table table-striped table-hover mb-0 align-middle">
+                                <thead class="table-secondary">
+                                    <tr>
+                                        <th>Дата и час</th>
+                                        <th>Студент</th>
+                                        <th>Дисциплина (Тип)</th>
+                                        <th>Статус</th>
+                                        <th>Източник</th>
+                                        <th id="actionColumn" class="hidden text-center">Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendanceTableBody">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">Зареждане на данни...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                        <div class="col-md-3">
-                            <label class="small fw-bold text-muted">Дисциплина и Час</label>
-                            <select id="addScheduleId" class="form-select form-select-sm" required><option value="" disabled selected>Зареждане...</option></select>
+                    </div>
+                    <div class="card-footer bg-light d-flex justify-content-between align-items-center">
+                        <span id="attTotalRecords" class="small fw-bold text-muted">Общо: 0 записа</span>
+                        <div class="btn-group">
+                            <button id="btnPrevPage" class="btn btn-sm btn-outline-dark fw-bold">← Предишна</button>
+                            <span id="attPageInfo" class="btn btn-sm btn-dark disabled">Стр. 1</span>
+                            <button id="btnNextPage" class="btn btn-sm btn-outline-dark fw-bold">Следваща →</button>
                         </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted">Дата на провеждане</label>
-                            <input type="date" id="addDate" class="form-control form-control-sm" required>
-                        </div>
-                        <div class="col-md-1">
-                            <label class="small fw-bold text-muted">Статус</label>
-                            <select id="addStatus" class="form-select form-select-sm">
-                                <option value="present">Присъствие</option><option value="makeup">Отработване</option><option value="excused">Извинено</option>
+                    </div>
+                </div>
+            </div>
+
+            <div id="createUserView" class="view-panel hidden">
+                <div class="card border-dark mb-4">
+                    <div
+                        class="card-header bg-dark text-white d-flex justify-content-between align-items-center fw-bold">
+                        <span>➕ Регистрация на нов Студент / Преподавател / Админ</span>
+                        <button class="btn btn-sm btn-outline-light" onclick="navigate('attendanceView')">← Обратно към
+                            присъствия</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3 col-md-3">
+                            <label class="fw-bold text-secondary">Изберете тип профил:</label>
+                            <select id="clerkRoleSelector" class="form-select bg-light fw-bold">
+                                <option value="student">Студент</option>
+                                <option value="teacher">Преподавател</option>
+                                <option value="admin">Администратор</option>
                             </select>
                         </div>
-                        <div class="col-md-1"><button type="submit" class="btn btn-success btn-sm w-100 fw-bold">Запиши</button></div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="card border-dark">
-                <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
-                    <span>📋 Дневен журнал на посещенията</span>
-                    <div class="d-flex gap-2">
-                        <input type="text" id="searchAttInput" class="form-control form-control-sm" placeholder="🔍 Търси Име или ФН..." style="width: 250px;">
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="min-height: 300px;">
-                        <table class="table table-striped table-hover mb-0 align-middle">
-                            <thead class="table-secondary">
-                                <tr><th>Дата и час</th><th>Студент</th><th>Дисциплина (Тип)</th><th>Статус</th><th>Източник</th><th id="actionColumn" class="hidden text-center">Действия</th></tr>
-                            </thead>
-                            <tbody id="attendanceTableBody">
-                                <tr><td colspan="6" class="text-center text-muted">Зареждане на данни...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="card-footer bg-light d-flex justify-content-between align-items-center">
-                    <span id="attTotalRecords" class="small fw-bold text-muted">Общо: 0 записа</span>
-                    <div class="btn-group">
-                        <button id="btnPrevPage" class="btn btn-sm btn-outline-dark fw-bold">← Предишна</button>
-                        <span id="attPageInfo" class="btn btn-sm btn-dark disabled">Стр. 1</span>
-                        <button id="btnNextPage" class="btn btn-sm btn-outline-dark fw-bold">Следваща →</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="createUserView" class="view-panel hidden">
-            <div class="card border-dark mb-4">
-                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center fw-bold">
-                    <span>➕ Регистрация на нов Студент / Преподавател / Админ</span>
-                    <button class="btn btn-sm btn-outline-light" onclick="navigate('attendanceView')">← Обратно към присъствия</button>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3 col-md-3">
-                        <label class="fw-bold text-secondary">Изберете тип профил:</label>
-                        <select id="clerkRoleSelector" class="form-select bg-light fw-bold">
-                            <option value="student">Студент</option><option value="teacher">Преподавател</option><option value="admin">Администратор</option>
-                        </select>
-                    </div>
-                    <form id="clerkRegistrationForm" class="row g-3">
-                        <div class="col-md-6" id="clerkNameWrapper"><label class="form-label">Три имена</label><input type="text" id="clerkName" class="form-control" required></div>
-                        <div class="col-md-3"><label class="form-label">Потребителско име</label><input type="text" id="clerkUsername" class="form-control" required></div>
-                        <div class="col-md-3"><label class="form-label">Парола</label><input type="password" id="clerkPassword" class="form-control" required></div>
-                        <div id="clerkStudentFields" class="row g-3 mt-1 p-0 m-0">
-                            <div class="col-md-3"><label class="text-primary fw-bold">Факултетен номер</label><input type="text" id="clerkFacultyNumber" class="form-control border-primary"></div>
-                            <div class="col-md-3"><label class="text-primary fw-bold">RFID UID код</label><input type="text" id="clerkRfidUid" class="form-control border-primary"></div>
-                            <div class="col-md-2"><label class="text-primary fw-bold">Група (номер)</label><input type="text" id="clerkGroupName" class="form-control border-primary"></div>
-                            <div class="col-md-2"><label class="text-primary fw-bold">Курс</label>
-                                <select id="clerkGroupYear" class="form-select border-primary"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+                        <form id="clerkRegistrationForm" class="row g-3">
+                            <div class="col-md-6" id="clerkNameWrapper"><label class="form-label">Три
+                                    имена</label><input type="text" id="clerkName" class="form-control" required></div>
+                            <div class="col-md-3"><label class="form-label">Потребителско име</label><input type="text"
+                                    id="clerkUsername" class="form-control" required></div>
+                            <div class="col-md-3"><label class="form-label">Парола</label><input type="password"
+                                    id="clerkPassword" class="form-control" required></div>
+                            <div id="clerkStudentFields" class="row g-3 mt-1 p-0 m-0">
+                                <div class="col-md-3"><label class="text-primary fw-bold">Факултетен номер</label><input
+                                        type="text" id="clerkFacultyNumber" class="form-control border-primary"></div>
+                                <div class="col-md-3"><label class="text-primary fw-bold">RFID UID код</label><input
+                                        type="text" id="clerkRfidUid" class="form-control border-primary"></div>
+                                <div class="col-md-2"><label class="text-primary fw-bold">Група (номер)</label><input
+                                        type="text" id="clerkGroupName" class="form-control border-primary"></div>
+                                <div class="col-md-2"><label class="text-primary fw-bold">Курс</label>
+                                    <select id="clerkGroupYear" class="form-select border-primary">
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2"><label class="text-primary fw-bold">Специалност</label><input
+                                        type="text" id="clerkGroupMajor" class="form-control border-primary"
+                                        placeholder="КСТ"></div>
                             </div>
-                            <div class="col-md-2"><label class="text-primary fw-bold">Специалност</label><input type="text" id="clerkGroupMajor" class="form-control border-primary" placeholder="КСТ"></div>
-                        </div>
-                        <div id="clerkTeacherFields" class="row g-3 mt-1 p-0 m-0 hidden">
-                            <div class="col-md-6"><label class="text-success fw-bold">Академична длъжност</label><input type="text" id="clerkTitle" class="form-control border-success"></div>
-                            <div class="col-md-6"><label class="text-success fw-bold">Катедра</label><input type="text" id="clerkDepartment" class="form-control border-success"></div>
-                        </div>
-                        <div class="col-12 mt-3"><button type="submit" class="btn btn-dark w-100 fw-bold">Запиши в системата</button></div>
-                    </form>
-                </div>
-            </div>
-            
-            <div class="row g-3">
-                <div class="col-md-5">
-                    <div class="card border-primary h-100"><div class="card-header bg-primary text-white fw-bold">👨‍🎓 Студенти</div>
-                        <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-striped mb-0 align-middle"><thead class="table-light"><tr><th>Име</th><th>ФН</th><th class="text-end">Действие</th></tr></thead><tbody id="adminStudentsTableBody"></tbody></table></div></div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card border-success h-100"><div class="card-header bg-success text-white fw-bold">👩‍🏫 Преподаватели</div>
-                        <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-striped mb-0 align-middle"><thead class="table-light"><tr><th>Име</th><th>Катедра</th><th class="text-end">Действие</th></tr></thead><tbody id="adminTeachersTableBody"></tbody></table></div></div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card border-warning h-100"><div class="card-header bg-warning text-dark fw-bold">📚 Групи</div>
-                        <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-striped mb-0 align-middle"><thead class="table-light"><tr><th>Група</th><th>Спец.</th><th class="text-end">Действие</th></tr></thead><tbody id="adminGroupsTableBody"></tbody></table></div></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="curriculumView" class="view-panel hidden">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3 class="mb-0 fw-bold text-dark">Администриране на Семестриалния План</h3>
-                <button onclick="navigate('attendanceView')" class="btn btn-outline-dark btn-sm">← Назад</button>
-            </div>
-            
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <div class="card border-dark h-100"><div class="card-header bg-dark text-white fw-bold">1. Дисциплини (Courses)</div>
-                        <div class="card-body d-flex flex-column">
-                            <form id="createCourseForm" class="mb-3">
-                                <div class="input-group input-group-sm"><input type="text" id="courseName" class="form-control" placeholder="Име на предмет" required><button type="submit" class="btn btn-dark fw-bold">Добави</button></div>
-                            </form>
-                            <hr class="mt-0"><div class="overflow-auto"><ul class="list-group list-group-flush" id="coursesList"></ul></div>
-                        </div>
+                            <div id="clerkTeacherFields" class="row g-3 mt-1 p-0 m-0 hidden">
+                                <div class="col-md-6"><label class="text-success fw-bold">Академична
+                                        длъжност</label><input type="text" id="clerkTitle"
+                                        class="form-control border-success"></div>
+                                <div class="col-md-6"><label class="text-success fw-bold">Катедра</label><input
+                                        type="text" id="clerkDepartment" class="form-control border-success"></div>
+                            </div>
+                            <div class="col-12 mt-3"><button type="submit" class="btn btn-dark w-100 fw-bold">Запиши в
+                                    системата</button></div>
+                        </form>
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <div class="card border-secondary h-100"><div class="card-header bg-secondary text-white fw-bold">2. Зачисляване на Учебен План</div>
-                        <div class="card-body d-flex flex-column">
-                            <form id="createGroupCourseForm" class="mb-3 row g-2">
-                                <div class="mb-1"><select id="gcGroupId" class="form-select form-select-sm" required></select></div>
-                                <div class="mb-1"><select id="gcCourseId" class="form-select form-select-sm" required></select></div>
-                                <div class="mb-1"><select id="gcTeacherId" class="form-select form-select-sm"></select></div>
-                                <div class="mb-2"><select id="gcType" class="form-select form-select-sm"><option value="lecture">Лекция</option><option value="exercise">Упражнение</option><option value="lab">Лабораторно упр.</option></select></div>
-                                <button type="submit" class="btn btn-secondary btn-sm w-100 fw-bold">Свържи в план</button>
-                            </form>
-                            <hr class="mt-0"><div class="overflow-auto"><ul class="list-group list-group-flush" id="groupCoursesList"></ul></div>
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <div class="card border-primary h-100">
+                            <div class="card-header bg-primary text-white fw-bold">👨‍🎓 Студенти</div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped mb-0 align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Име</th>
+                                                <th>ФН</th>
+                                                <th class="text-end">Действие</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="adminStudentsTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-success h-100">
+                            <div class="card-header bg-success text-white fw-bold">👩‍🏫 Преподаватели</div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped mb-0 align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Име</th>
+                                                <th>Катедра</th>
+                                                <th class="text-end">Действие</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="adminTeachersTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-warning h-100">
+                            <div class="card-header bg-warning text-dark fw-bold">📚 Групи</div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped mb-0 align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Група</th>
+                                                <th>Спец.</th>
+                                                <th class="text-end">Действие</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="adminGroupsTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="col-md-4">
-                    <div class="card border-primary h-100"><div class="card-header bg-primary text-white fw-bold">3. Седмичен График на Залите</div>
-                        <div class="card-body d-flex flex-column" style="max-height: 550px; overflow-y: auto;">
-                            <form id="createScheduleForm" class="row g-2 small">
-                                <div class="col-12"><select id="schedGcId" class="form-select form-select-sm" required></select></div>
-                                <div class="col-6"><input type="text" id="schedRoom" class="form-control form-control-sm" placeholder="Зала №" required></div>
-                                <div class="col-6"><select id="schedDay" class="form-select form-select-sm"><option value="0">Понеделник</option><option value="1">Вторник</option><option value="2">Сряда</option><option value="3">Четвъртък</option><option value="4">Петък</option><option value="5">Събота</option></select></div>
-                                <div class="col-6"><label class="m-0">Начало</label><input type="time" id="schedStartTime" class="form-control form-control-sm" required></div>
-                                <div class="col-6"><label class="m-0">Край</label><input type="time" id="schedEndTime" class="form-control form-control-sm" required></div>
-                                <div class="col-6"><select id="schedParity" class="form-select form-select-sm"><option value="all">Всяка седм.</option><option value="odd">Нечетна</option><option value="even">Четна</option></select></div>
-                                <div class="col-6"><select id="schedSubgroup" class="form-select form-select-sm"><option value="">Цяла група</option><option value="A">Поток А</option><option value="B">Поток Б</option></select></div>
-                                <div class="col-6"><label class="m-0">От дата</label><input type="date" id="schedStartDate" class="form-control form-control-sm" required></div>
-                                <div class="col-6"><label class="m-0">До дата</label><input type="date" id="schedEndDate" class="form-control form-control-sm" required></div>
-                                <div class="col-12"><button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">Запиши в Часовия график</button></div>
-                            </form>
-                            <hr><div class="overflow-auto"><ul class="list-group list-group-flush" id="schedulesList"></ul></div>
+            <div id="curriculumView" class="view-panel hidden">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="mb-0 fw-bold text-dark">Администриране на Семестриалния План</h3>
+                    <button onclick="navigate('attendanceView')" class="btn btn-outline-dark btn-sm">← Назад</button>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card border-dark h-100">
+                            <div class="card-header bg-dark text-white fw-bold">1. Дисциплини (Courses)</div>
+                            <div class="card-body d-flex flex-column">
+                                <form id="createCourseForm" class="mb-3">
+                                    <div class="input-group input-group-sm"><input type="text" id="courseName"
+                                            class="form-control" placeholder="Име на предмет" required><button
+                                            type="submit" class="btn btn-dark fw-bold">Добави</button></div>
+                                </form>
+                                <hr class="mt-0">
+                                <div class="overflow-auto">
+                                    <ul class="list-group list-group-flush" id="coursesList"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border-secondary h-100">
+                            <div class="card-header bg-secondary text-white fw-bold">2. Зачисляване на Учебен План</div>
+                            <div class="card-body d-flex flex-column">
+                                <form id="createGroupCourseForm" class="mb-3 row g-2">
+                                    <div class="mb-1"><select id="gcGroupId" class="form-select form-select-sm"
+                                            required></select></div>
+                                    <div class="mb-1"><select id="gcCourseId" class="form-select form-select-sm"
+                                            required></select></div>
+                                    <div class="mb-1"><select id="gcTeacherId"
+                                            class="form-select form-select-sm"></select></div>
+                                    <div class="mb-2"><select id="gcType" class="form-select form-select-sm">
+                                            <option value="lecture">Лекция</option>
+                                            <option value="exercise">Упражнение</option>
+                                            <option value="lab">Лабораторно упр.</option>
+                                        </select></div>
+                                    <button type="submit" class="btn btn-secondary btn-sm w-100 fw-bold">Свържи в
+                                        план</button>
+                                </form>
+                                <hr class="mt-0">
+                                <div class="overflow-auto">
+                                    <ul class="list-group list-group-flush" id="groupCoursesList"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border-primary h-100">
+                            <div class="card-header bg-primary text-white fw-bold">3. Седмичен График на Залите</div>
+                            <div class="card-body d-flex flex-column" style="max-height: 550px; overflow-y: auto;">
+                                <form id="createScheduleForm" class="row g-2 small">
+                                    <div class="col-12"><select id="schedGcId" class="form-select form-select-sm"
+                                            required></select></div>
+                                    <div class="col-6"><input type="text" id="schedRoom"
+                                            class="form-control form-control-sm" placeholder="Зала №" required></div>
+                                    <div class="col-6"><select id="schedDay" class="form-select form-select-sm">
+                                            <option value="0">Понеделник</option>
+                                            <option value="1">Вторник</option>
+                                            <option value="2">Сряда</option>
+                                            <option value="3">Четвъртък</option>
+                                            <option value="4">Петък</option>
+                                            <option value="5">Събота</option>
+                                        </select></div>
+                                    <div class="col-6"><label class="m-0">Начало</label><input type="time"
+                                            id="schedStartTime" class="form-control form-control-sm" required></div>
+                                    <div class="col-6"><label class="m-0">Край</label><input type="time"
+                                            id="schedEndTime" class="form-control form-control-sm" required></div>
+                                    <div class="col-6"><select id="schedParity" class="form-select form-select-sm">
+                                            <option value="false">Всяка седм.</option>
+                                            <option value="true">През седмица</option>
+                                        </select></div>
+                                    <div class="col-6"><select id="schedSubgroup" class="form-select form-select-sm">
+                                            <option value="">Цяла група</option>
+                                            <option value="A">Поток А</option>
+                                            <option value="B">Поток Б</option>
+                                        </select></div>
+                                    <div class="col-6"><label class="m-0">От дата</label><input type="date"
+                                            id="schedStartDate" class="form-control form-control-sm" required></div>
+                                    <div class="col-6"><label class="m-0">До дата</label><input type="date"
+                                            id="schedEndDate" class="form-control form-control-sm" required></div>
+                                    <div class="col-12"><button type="submit"
+                                            class="btn btn-primary btn-sm w-100 fw-bold">Запиши в Часовия
+                                            график</button></div>
+                                </form>
+                                <hr>
+                                <div class="overflow-auto">
+                                    <ul class="list-group list-group-flush" id="schedulesList"></ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="modal fade" id="editAttendanceModal" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header bg-warning fw-bold"><h5>✏️ Редакция Статус</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editAttendanceForm"><div class="modal-body"><input type="hidden" id="editAttId"><label>Нов Статус</label><select id="editAttStatus" class="form-select"><option value="present">Присъствие</option><option value="makeup">Отработване</option><option value="excused">Извинено</option></select></div><div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm w-100">Запази</button></div></form></div></div></div>
+    <div class="modal fade" id="editAttendanceModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-warning fw-bold">
+                    <h5>✏️ Редакция Статус</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editAttendanceForm">
+                    <div class="modal-body"><input type="hidden" id="editAttId"><label>Нов Статус</label><select
+                            id="editAttStatus" class="form-select">
+                            <option value="present">Присъствие</option>
+                            <option value="makeup">Отработване</option>
+                            <option value="excused">Извинено</option>
+                        </select></div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm w-100">Запази</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-<div class="modal fade" id="editGroupModal" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header bg-warning fw-bold"><h5>✏️ Редакция Група</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editGroupForm"><div class="modal-body"><input type="hidden" id="editGroupId"><div class="mb-2"><label>Група (Номер)</label><input type="text" id="editGroupName" class="form-control"></div><div class="mb-2"><label>Курс</label><input type="number" id="editGroupYear" class="form-control"></div><div class="mb-2"><label>Спец.</label><input type="text" id="editGroupMajor" class="form-control"></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm w-100">Запази</button></div></form></div></div></div>
+    <div class="modal fade" id="editGroupModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-warning fw-bold">
+                    <h5>✏️ Редакция Група</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editGroupForm">
+                    <div class="modal-body"><input type="hidden" id="editGroupId">
+                        <div class="mb-2"><label>Група (Номер)</label><input type="text" id="editGroupName"
+                                class="form-control"></div>
+                        <div class="mb-2"><label>Курс</label><input type="number" id="editGroupYear"
+                                class="form-control"></div>
+                        <div class="mb-2"><label>Спец.</label><input type="text" id="editGroupMajor"
+                                class="form-control"></div>
+                    </div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm w-100">Запази</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-<div class="modal fade" id="editStudentModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-warning fw-bold"><h5>✏️ Редакция на Студент</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editStudentForm"><div class="modal-body"><input type="hidden" id="editStudentId"><div class="mb-2"><label>Три имена</label><input type="text" id="editStudentName" class="form-control" required></div><div class="mb-2"><label>Факултетен номер</label><input type="text" id="editStudentFN" class="form-control" required></div><div class="mb-2"><label>RFID UID код</label><input type="text" id="editStudentRFID" class="form-control" required></div><div class="row g-2 border p-2 bg-light rounded"><p class="m-0 small fw-bold text-muted">Нова структура на Групата (при промяна)</p><div class="col-4"><input type="text" id="editStudentGName" class="form-control form-control-sm" placeholder="Група"></div><div class="col-4"><input type="number" id="editStudentGYear" class="form-control form-control-sm" placeholder="Курс"></div><div class="col-4"><input type="text" id="editStudentGMajor" class="form-control form-control-sm" placeholder="Спец."></div></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Запази</button></div></form></div></div></div>
+    <div class="modal fade" id="editStudentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning fw-bold">
+                    <h5>✏️ Редакция на Студент</h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editStudentForm">
+                    <div class="modal-body"><input type="hidden" id="editStudentId">
+                        <div class="mb-2"><label>Три имена</label><input type="text" id="editStudentName"
+                                class="form-control" required></div>
+                        <div class="mb-2"><label>Факултетен номер</label><input type="text" id="editStudentFN"
+                                class="form-control" required></div>
+                        <div class="mb-2"><label>RFID UID код</label><input type="text" id="editStudentRFID"
+                                class="form-control" required></div>
+                        <div class="row g-2 border p-2 bg-light rounded">
+                            <p class="m-0 small fw-bold text-muted">Нова структура на Групата (при промяна)</p>
+                            <div class="col-4"><input type="text" id="editStudentGName"
+                                    class="form-control form-control-sm" placeholder="Група"></div>
+                            <div class="col-4"><input type="number" id="editStudentGYear"
+                                    class="form-control form-control-sm" placeholder="Курс"></div>
+                            <div class="col-4"><input type="text" id="editStudentGMajor"
+                                    class="form-control form-control-sm" placeholder="Спец."></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Запази</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-<div class="modal fade" id="editTeacherModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-warning fw-bold"><h5>✏️ Редакция на Преподавател</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editTeacherForm"><div class="modal-body"><input type="hidden" id="editTeacherId"><div class="mb-2"><label>Име</label><input type="text" id="editTeacherName" class="form-control" required></div><div class="mb-2"><label>Академична титла</label><input type="text" id="editTeacherTitle" class="form-control"></div><div class="mb-2"><label>Катедра</label><input type="text" id="editTeacherDept" class="form-control"></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Запази</button></div></form></div></div></div>
+    <div class="modal fade" id="editTeacherModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning fw-bold">
+                    <h5>✏️ Редакция на Преподавател</h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editTeacherForm">
+                    <div class="modal-body"><input type="hidden" id="editTeacherId">
+                        <div class="mb-2"><label>Име</label><input type="text" id="editTeacherName" class="form-control"
+                                required></div>
+                        <div class="mb-2"><label>Академична титла</label><input type="text" id="editTeacherTitle"
+                                class="form-control"></div>
+                        <div class="mb-2"><label>Катедра</label><input type="text" id="editTeacherDept"
+                                class="form-control"></div>
+                    </div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Запази</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-<div class="modal fade" id="editCourseModal" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header bg-warning fw-bold"><h5>✏️ Редакция на Дисциплина</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editCourseForm"><div class="modal-body"><input type="hidden" id="editCourseId"><div class="mb-3"><label>Име на предмета</label><input type="text" id="editCourseName" class="form-control" required></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm w-100">Запази</button></div></form></div></div></div>
+    <div class="modal fade" id="editCourseModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-warning fw-bold">
+                    <h5>✏️ Редакция на Дисциплина</h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editCourseForm">
+                    <div class="modal-body"><input type="hidden" id="editCourseId">
+                        <div class="mb-3"><label>Име на предмета</label><input type="text" id="editCourseName"
+                                class="form-control" required></div>
+                    </div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm w-100">Запази</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-<div class="modal fade" id="editGroupCourseModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-warning fw-bold"><h5>✏️ Редакция на зачислен план</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editGroupCourseForm"><div class="modal-body"><input type="hidden" id="editGcId"><div class="mb-2"><label>Група</label><select id="editGcGroupId" class="form-select"></select></div><div class="mb-2"><label>Предмет</label><select id="editGcCourseId" class="form-select"></select></div><div class="mb-2"><label>Преподавател</label><select id="editGcTeacherId" class="form-select"></select></div><div class="mb-2"><label>Тип урок</label><select id="editGcType" class="form-select"><option value="lecture">Лекция</option><option value="exercise">Упражнение</option><option value="lab">Лабораторно упр.</option></select></div><div class="mb-2"><label>Семестър</label><input type="number" id="editGcSemester" class="form-control"></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Запази</button></div></form></div></div></div>
+    <div class="modal fade" id="editGroupCourseModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning fw-bold">
+                    <h5>✏️ Редакция на зачислен план</h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editGroupCourseForm">
+                    <div class="modal-body"><input type="hidden" id="editGcId">
+                        <div class="mb-2"><label>Група</label><select id="editGcGroupId" class="form-select"></select>
+                        </div>
+                        <div class="mb-2"><label>Предмет</label><select id="editGcCourseId"
+                                class="form-select"></select></div>
+                        <div class="mb-2"><label>Преподавател</label><select id="editGcTeacherId"
+                                class="form-select"></select></div>
+                        <div class="mb-2"><label>Тип урок</label><select id="editGcType" class="form-select">
+                                <option value="lecture">Лекция</option>
+                                <option value="exercise">Упражнение</option>
+                                <option value="lab">Лабораторно упр.</option>
+                            </select></div>
+                        <div class="mb-2"><label>Семестър</label><input type="number" id="editGcSemester"
+                                class="form-control"></div>
+                    </div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Запази</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-<div class="modal fade" id="editScheduleModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-warning fw-bold"><h5>✏️ Редакция на Час от Графика</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editScheduleForm"><div class="modal-body row g-2 small"><input type="hidden" id="editSchedId"><div class="col-6"><label>Зала</label><input type="text" id="editSchedRoom" class="form-control form-control-sm" required></div><div class="col-6"><label>Ден</label><select id="editSchedDay" class="form-select form-select-sm"><option value="0">Понеделник</option><option value="1">Вторник</option><option value="2">Сряда</option><option value="3">Четвъртък</option><option value="4">Петък</option><option value="5">Събота</option></select></div><div class="col-6"><label>Начало</label><input type="time" id="editSchedStart" class="form-control form-control-sm" required></div><div class="col-6"><label>Край</label><input type="time" id="editSchedEnd" class="form-control form-control-sm" required></div><div class="col-6"><label>Седмица</label><select id="editSchedParity" class="form-select form-select-sm"><option value="all">Всяка</option><option value="odd">Нечетна</option><option value="even">Четна</option></select></div><div class="col-6"><label>Подгрупа</label><select id="editSchedSub" class="form-select form-select-sm"><option value="">Цялата</option><option value="A">А</option><option value="B">Б</option></select></div><div class="col-6"><label>От дата</label><input type="date" id="editSchedSDate" class="form-control form-control-sm" required></div><div class="col-6"><label>До дата</label><input type="date" id="editSchedEDate" class="form-control form-control-sm" required></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Запази</button></div></form></div></div></div>
+    <div class="col-6"><label>Седмица</label><select id="editSchedParity" class="form-select form-select-sm">
+            <option value="false">Всяка</option>
+            <option value="true">През седмица</option>
+        </select></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = "http://localhost:8000";
+        let token = localStorage.getItem("token");
+        let userRole = null;
+        let globalData = { groups: [], courses: [], teachers: [], students: [], groupCourses: [], schedules: [] };
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    const API_BASE = "http://localhost:8000";
-    let token = localStorage.getItem("token");
-    let userRole = null;
-    let globalData = { groups: [], courses: [], teachers: [], students: [], groupCourses: [], schedules: [] };
+        // Променливи за Пагинация
+        let currentPage = 1;
+        const itemsPerPage = 50;
+        let searchTimer = null;
 
-    // Променливи за Пагинация
-    let currentPage = 1;
-    const itemsPerPage = 50;
-    let searchTimer = null;
+        function parseJwt(t) { try { return JSON.parse(atob(t.split('.')[1])); } catch (e) { return null; } }
+        function navigate(viewId) { document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden')); document.getElementById(viewId).classList.remove('hidden'); }
 
-    function parseJwt(t) { try { return JSON.parse(atob(t.split('.')[1])); } catch (e) { return null; } }
-    function navigate(viewId) { document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden')); document.getElementById(viewId).classList.remove('hidden'); }
+        function checkAuthState() {
+            if (token) {
+                const payload = parseJwt(token);
+                if (payload) {
+                    userRole = payload.role;
+                    document.getElementById('loginSection').classList.add('hidden');
+                    document.getElementById('dashboardSection').classList.remove('hidden');
+                    document.getElementById('welcomeMessage').innerText = `Здравей, ${payload.sub} [${userRole.toUpperCase()}]`;
 
-    function checkAuthState() {
-        if (token) {
-            const payload = parseJwt(token);
-            if (payload) {
-                userRole = payload.role;
-                document.getElementById('loginSection').classList.add('hidden');
-                document.getElementById('dashboardSection').classList.remove('hidden');
-                document.getElementById('welcomeMessage').innerText = `Здравей, ${payload.sub} [${userRole.toUpperCase()}]`;
-                
-                if (userRole === 'teacher' || userRole === 'admin') {
-                    document.getElementById('teacherControls').classList.remove('hidden');
-                    document.getElementById('actionColumn').classList.remove('hidden');
-                }
-                if (userRole === 'admin') {
-                    document.getElementById('showCreateUserBtn').classList.remove('hidden');
-                    document.getElementById('showCurriculumBtn').classList.remove('hidden');
-                }
-                loadAttendance();
-                if (userRole === 'admin' || userRole === 'teacher') loadDropdownData();
-            } else { logout(); }
-        }
-    }
-
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault(); const fd = new FormData(); fd.append("username", document.getElementById('username').value); fd.append("password", document.getElementById('password').value);
-        try { const r = await fetch(`${API_BASE}/auth/login`, { method: 'POST', body: fd });
-            if (r.ok) { token = (await r.json()).access_token; localStorage.setItem("token", token); document.getElementById('loginError').classList.add('hidden'); checkAuthState(); } 
-            else { document.getElementById('loginError').classList.remove('hidden'); }
-        } catch (err) { console.error(err); }
-    });
-
-    async function loadDropdownData() {
-        const h = { 'Authorization': `Bearer ${token}` };
-        try {
-            // Добавяме проверка r.ok, за да връщаме празен масив [] при грешка, вместо да крашва
-            const [grp, crs, tchr, std, gc, sch] = await Promise.all([
-                fetch(`${API_BASE}/auth/groups`, {headers:h}).then(r => r.ok ? r.json() : []),
-                fetch(`${API_BASE}/admin/courses`, {headers:h}).then(r => r.ok ? r.json() : []),
-                fetch(`${API_BASE}/auth/teachers`, {headers:h}).then(r => r.ok ? r.json() : []),
-                fetch(`${API_BASE}/auth/students`, {headers:h}).then(r => r.ok ? r.json() : []),
-                fetch(`${API_BASE}/admin/group-courses`, {headers:h}).then(r => r.ok ? r.json() : []),
-                fetch(`${API_BASE}/admin/schedules`, {headers:h}).then(r => r.ok ? r.json() : [])
-            ]);
-            globalData = { groups: grp, courses: crs, teachers: tchr, students: std, groupCourses: gc, schedules: sch };
-            populateDropdowns(); populateAdminLists();
-        } catch (e) { console.error("Грешка при зареждане на справочните данни:", e); }
-    }
-
-    function populateDropdowns() {
-        const fill = (id, arr, template) => {
-            const el = document.getElementById(id); if (!el) return;
-            el.innerHTML = '<option value="" disabled selected>-- Изберете --</option>';
-            arr.forEach(x => el.innerHTML += template(x));
-        };
-        fill('gcGroupId', globalData.groups, g => `<option value="${g.id}">Гр. ${g.name} (${g.major})</option>`);
-        fill('editGcGroupId', globalData.groups, g => `<option value="${g.id}">Гр. ${g.name} (${g.major})</option>`);
-        fill('gcCourseId', globalData.courses, c => `<option value="${c.id}">${c.name}</option>`);
-        fill('editGcCourseId', globalData.courses, c => `<option value="${c.id}">${c.name}</option>`);
-        fill('gcTeacherId', globalData.teachers, t => `<option value="${t.id}">${t.title||''} ${t.name}</option>`);
-        fill('editGcTeacherId', globalData.teachers, t => `<option value="${t.id}">${t.title||''} ${t.name}</option>`);
-        document.getElementById('gcTeacherId').innerHTML = '<option value="">-- Без преподавател --</option>' + document.getElementById('gcTeacherId').innerHTML;
-        document.getElementById('editGcTeacherId').innerHTML = '<option value="">-- Без преподавател --</option>' + document.getElementById('editGcTeacherId').innerHTML;
-
-        const tm = { 'lecture': 'Лекция', 'exercise': 'Упраж.', 'lab': 'Лаб.' };
-        fill('schedGcId', globalData.groupCourses, gc => {
-            let g = globalData.groups.find(x => x.id === gc.group_id), c = globalData.courses.find(x => x.id === gc.course_id);
-            return `<option value="${gc.id}">Гр. ${g?.name||'?'} - ${c?.name||'?'} (${tm[gc.type]})</option>`;
-        });
-        
-        const fGrp = document.getElementById('filterAttGroup'); if(fGrp) {
-            fGrp.innerHTML = '<option value="" selected>-- Всички --</option>';
-            globalData.groups.forEach(g => fGrp.innerHTML += `<option value="${g.id}">Група ${g.name}</option>`);
-        }
-        renderFilteredStudents("");
-
-        const days = ["Пон", "Вто", "Сря", "Чет", "Пет", "Съб", "Нед"];
-        fill('addScheduleId', globalData.schedules, s => {
-            let gc = globalData.groupCourses.find(x => x.id === s.group_course_id);
-            let c = globalData.courses.find(x => gc && x.id === gc.course_id);
-            return `<option value="${s.id}">${c?.name||'Предмет'} (${tm[gc?.type]}) | ${days[s.day_of_week]} ${s.start_time} (Зала ${s.room_number})</option>`;
-        });
-    }
-
-    function renderFilteredStudents(gId) {
-        const el = document.getElementById('addStudentId'); if(!el) return;
-        el.innerHTML = '<option value="" disabled selected>Изберете студент...</option>';
-        let arr = globalData.students; if(gId) arr = arr.filter(s => s.group_id == parseInt(gId));
-        arr.forEach(s => el.innerHTML += `<option value="${s.student_id}">${s.name} (ФН: ${s.faculty_number})</option>`);
-    }
-    document.getElementById('filterAttGroup')?.addEventListener('change', (e) => renderFilteredStudents(e.target.value));
-
-    function populateAdminLists() {
-        const cList = document.getElementById('coursesList'); if(cList) { cList.innerHTML=''; globalData.courses.forEach(c => cList.innerHTML+=`<li class="list-group-item d-flex justify-content-between align-middle py-1 px-2"><span class="small">${c.name}</span><button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="openEditCourse(${c.id}, '${c.name.replace(/'/g, "\\'")}')">✏️</button></li>`);}
-        const gcList = document.getElementById('groupCoursesList'); if(gcList) { gcList.innerHTML=''; globalData.groupCourses.forEach(gc => { let g=globalData.groups.find(x=>x.id===gc.group_id); let c=globalData.courses.find(x=>x.id===gc.course_id); gcList.innerHTML+=`<li class="list-group-item d-flex justify-content-between align-middle py-1 px-2"><span class="small">Гр.${g?.name} - ${c?.name}</span><button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="openEditGc(${gc.id}, ${gc.group_id}, ${gc.course_id}, ${gc.teacher_id}, '${gc.type}', ${gc.semester})">✏️</button></li>` });}
-        const sList = document.getElementById('schedulesList'); if(sList) { sList.innerHTML=''; globalData.schedules.forEach(s => { let gc=globalData.groupCourses.find(x=>x.id===s.group_course_id); let c=globalData.courses.find(x=>gc && x.id===gc.course_id); sList.innerHTML+=`<li class="list-group-item d-flex justify-content-between align-middle py-1 px-2"><span class="small">${c?.name||'Час'} - Зала ${s.room_number}</span><button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="openEditSched(${s.id},'${s.room_number}',${s.day_of_week},'${s.start_time}','${s.end_time}','${s.week_parity}','${s.subgroup||''}','${s.start_date}','${s.end_date}')">✏️</button></li>` });}
-        
-        const stdBody = document.getElementById('adminStudentsTableBody'); if(stdBody) {stdBody.innerHTML=''; globalData.students.forEach(s => stdBody.innerHTML+=`<tr><td>${s.name}</td><td>${s.faculty_number}</td><td class="text-end"><button class="btn btn-sm btn-outline-secondary py-0" onclick="openEditStudent(${s.student_id},'${s.name}','${s.faculty_number}','${s.rfid_uid}')">✏️</button></td></tr>`);}
-        const tchBody = document.getElementById('adminTeachersTableBody'); if(tchBody) {tchBody.innerHTML=''; globalData.teachers.forEach(t => tchBody.innerHTML+=`<tr><td>${t.title||''} ${t.name}</td><td>${t.department||'-'}</td><td class="text-end"><button class="btn btn-sm btn-outline-secondary py-0" onclick="openEditTeacher(${t.id},'${t.name}','${t.title||''}','${t.department||''}')">✏️</button></td></tr>`);}
-        const grpBody = document.getElementById('adminGroupsTableBody'); if(grpBody) {grpBody.innerHTML=''; globalData.groups.forEach(g => grpBody.innerHTML+=`<tr><td>${g.name} (К:${g.year})</td><td>${g.major}</td><td class="text-end"><button class="btn btn-sm btn-outline-secondary py-0" onclick="openEditGroup(${g.id},'${g.name}',${g.year},'${g.major}')">✏️</button></td></tr>`);}
-    }
-
-    // ================= РЕДАКЦИЯ ОПЕРАЦИИ (MODALS + PATCH) =================
-    const patchData = async (url, body, modalId) => {
-        try { const r = await fetch(API_BASE+url, {method:'PATCH', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify(body)});
-            if(r.ok){ bootstrap.Modal.getInstance(document.getElementById(modalId)).hide(); loadDropdownData(); loadAttendance(); } else { alert((await r.json()).detail); }
-        } catch(e) { console.error(e); }
-    };
-
-    function openEditAtt(id, st) { document.getElementById('editAttId').value=id; document.getElementById('editAttStatus').value=st; new bootstrap.Modal(document.getElementById('editAttendanceModal')).show(); }
-    document.getElementById('editAttendanceForm').addEventListener('submit', (e)=>{ e.preventDefault(); patchData(`/attendance/${document.getElementById('editAttId').value}`, {status: document.getElementById('editAttStatus').value}, 'editAttendanceModal'); });
-
-    function openEditGroup(id, n, y, m) { document.getElementById('editGroupId').value=id; document.getElementById('editGroupName').value=n; document.getElementById('editGroupYear').value=y; document.getElementById('editGroupMajor').value=m; new bootstrap.Modal(document.getElementById('editGroupModal')).show(); }
-    document.getElementById('editGroupForm').addEventListener('submit', (e)=>{ e.preventDefault(); patchData(`/admin/groups/${document.getElementById('editGroupId').value}`, {name: document.getElementById('editGroupName').value, year: parseInt(document.getElementById('editGroupYear').value), major: document.getElementById('editGroupMajor').value}, 'editGroupModal'); });
-
-    function openEditCourse(id, n) { document.getElementById('editCourseId').value=id; document.getElementById('editCourseName').value=n; new bootstrap.Modal(document.getElementById('editCourseModal')).show(); }
-    document.getElementById('editCourseForm').addEventListener('submit', (e)=>{ e.preventDefault(); patchData(`/admin/courses/${document.getElementById('editCourseId').value}`, {name: document.getElementById('editCourseName').value}, 'editCourseModal'); });
-
-    function openEditGc(id, gId, cId, tId, type, sem) { document.getElementById('editGcId').value=id; document.getElementById('editGcGroupId').value=gId; document.getElementById('editGcCourseId').value=cId; document.getElementById('editGcTeacherId').value=tId||""; document.getElementById('editGcType').value=type; document.getElementById('editGcSemester').value=sem; new bootstrap.Modal(document.getElementById('editGroupCourseModal')).show(); }
-    document.getElementById('editGroupCourseForm').addEventListener('submit', (e)=>{ e.preventDefault(); patchData(`/admin/group-courses/${document.getElementById('editGcId').value}`, {group_id: parseInt(document.getElementById('editGcGroupId').value), course_id: parseInt(document.getElementById('editGcCourseId').value), teacher_id: parseInt(document.getElementById('editGcTeacherId').value)||0, type: document.getElementById('editGcType').value, semester: parseInt(document.getElementById('editGcSemester').value)||null}, 'editGroupCourseModal'); });
-
-    function openEditSched(id, r, d, s, e, p, sub, sd, ed) { document.getElementById('editSchedId').value=id; document.getElementById('editSchedRoom').value=r; document.getElementById('editSchedDay').value=d; document.getElementById('editSchedStart').value=s.substring(0,5); document.getElementById('editSchedEnd').value=e.substring(0,5); document.getElementById('editSchedParity').value=p; document.getElementById('editSchedSub').value=sub; document.getElementById('editSchedSDate').value=sd; document.getElementById('editSchedEDate').value=ed; new bootstrap.Modal(document.getElementById('editScheduleModal')).show(); }
-    document.getElementById('editScheduleForm').addEventListener('submit', (e)=>{ e.preventDefault(); patchData(`/admin/schedules/${document.getElementById('editSchedId').value}`, {room_number: document.getElementById('editSchedRoom').value, day_of_week: parseInt(document.getElementById('editSchedDay').value), start_time: document.getElementById('editSchedStart').value, end_time: document.getElementById('editSchedEnd').value, week_parity: document.getElementById('editSchedParity').value, subgroup: document.getElementById('editSchedSub').value||"", start_date: document.getElementById('editSchedSDate').value, end_date: document.getElementById('editSchedEDate').value}, 'editScheduleModal'); });
-
-    function openEditStudent(id, n, fn, rfid) { document.getElementById('editStudentId').value=id; document.getElementById('editStudentName').value=n; document.getElementById('editStudentFN').value=fn; document.getElementById('editStudentRFID').value=rfid; document.getElementById('editStudentGName').value=''; document.getElementById('editStudentGYear').value=''; document.getElementById('editStudentGMajor').value=''; new bootstrap.Modal(document.getElementById('editStudentModal')).show(); }
-    document.getElementById('editStudentForm').addEventListener('submit', (e)=>{ e.preventDefault(); patchData(`/auth/students/${document.getElementById('editStudentId').value}`, {name: document.getElementById('editStudentName').value, faculty_number: document.getElementById('editStudentFN').value, rfid_uid: document.getElementById('editStudentRFID').value, group_name: document.getElementById('editStudentGName').value||null, group_year: parseInt(document.getElementById('editStudentGYear').value)||null, group_major: document.getElementById('editStudentGMajor').value||null}, 'editStudentModal'); });
-
-    function openEditTeacher(id, n, t, d) { document.getElementById('editTeacherId').value=id; document.getElementById('editTeacherName').value=n; document.getElementById('editTeacherTitle').value=t; document.getElementById('editTeacherDept').value=d; new bootstrap.Modal(document.getElementById('editTeacherModal')).show(); }
-    document.getElementById('editTeacherForm').addEventListener('submit', (e)=>{ e.preventDefault(); patchData(`/auth/teachers/${document.getElementById('editTeacherId').value}`, {name: document.getElementById('editTeacherName').value, title: document.getElementById('editTeacherTitle').value, department: document.getElementById('editTeacherDept').value}, 'editTeacherModal'); });
-
-
-    // ================= ПРИСЪСТВИЯ (GET ПАГИНАЦИЯ + ТЪРСЕНЕ) =================
-    async function loadAttendance() {
-        try {
-            const searchEl = document.getElementById('searchAttInput');
-            const searchQuery = searchEl ? searchEl.value : '';
-            const skip = (currentPage - 1) * itemsPerPage;
-            
-            let url = `${API_BASE}/attendance?skip=${skip}&limit=${itemsPerPage}`;
-            if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
-
-            const r = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-            const data = await r.json(); 
-            
-            const tbody = document.getElementById('attendanceTableBody'); 
-            if (!tbody) return;
-            tbody.innerHTML = '';
-            
-            // Защита за елементите на пагинацията
-            const totalRecordsEl = document.getElementById('attTotalRecords');
-            const pageInfoEl = document.getElementById('attPageInfo');
-            const btnPrev = document.getElementById('btnPrevPage');
-            const btnNext = document.getElementById('btnNextPage');
-
-            const totalPages = Math.ceil(data.total / itemsPerPage) || 1;
-            if(totalRecordsEl) totalRecordsEl.innerText = `Общо: ${data.total} записа`;
-            if(pageInfoEl) pageInfoEl.innerText = `Стр. ${currentPage} от ${totalPages}`;
-            if(btnPrev) btnPrev.disabled = (currentPage === 1);
-            if(btnNext) btnNext.disabled = (currentPage === totalPages);
-
-            const currUser = parseJwt(token)?.sub || '';
-            
-            if (!data.items || data.items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Няма намерени записи.</td></tr>`;
-                return;
+                    if (userRole === 'teacher' || userRole === 'admin') {
+                        document.getElementById('teacherControls').classList.remove('hidden');
+                        document.getElementById('actionColumn').classList.remove('hidden');
+                    }
+                    if (userRole === 'admin') {
+                        document.getElementById('showCreateUserBtn').classList.remove('hidden');
+                        document.getElementById('showCurriculumBtn').classList.remove('hidden');
+                    }
+                    loadAttendance();
+                    if (userRole === 'admin' || userRole === 'teacher') loadDropdownData();
+                } else { logout(); }
             }
-            
-            data.items.forEach(att => {
-                const tr = document.createElement('tr');
-                let badge = att.status==='present'?'bg-success':(att.status==='makeup'?'bg-warning text-dark':'bg-info text-dark');
-                let text = att.status==='present'?'Присъствие':(att.status==='makeup'?'Отработване':'Извинено');
-                let source = att.recorded_by==='Автоматичен'?'<strong class="text-primary">🤖 Автоматичен</strong>':`<span class="text-muted">✍️ Ръчно: <b>${att.recorded_by}</b></span>`;
-                
-                let canEditDel = userRole==='admin' || (userRole==='teacher' && (att.recorded_by==='Автоматичен' || att.recorded_by===currUser));
-                let actionBtns = canEditDel ? `<button class="btn btn-sm btn-outline-primary py-0 me-1" onclick="openEditAtt(${att.id}, '${att.status}')">✏️</button><button class="btn btn-sm btn-outline-danger py-0" onclick="deleteRecord(${att.id})">❌</button>` : '';
+        }
 
-                tr.innerHTML = `<td>${new Date(att.timestamp).toLocaleString('bg-BG')}</td><td><b>${att.student_name}</b></td><td>${att.course_name}</td><td><span class="badge ${badge}">${text}</span></td><td>${source}</td><td class="text-center px-3 ${userRole==='student'?'hidden':''}">${actionBtns}</td>`;
-                tbody.appendChild(tr);
-            });
-        } catch (err) { console.error("Error in loadAttendance:", err); }
-    }
-
-    document.getElementById('btnPrevPage')?.addEventListener('click', () => { if (currentPage > 1) { currentPage--; loadAttendance(); } });
-    document.getElementById('btnNextPage')?.addEventListener('click', () => { currentPage++; loadAttendance(); });
-
-    document.getElementById('searchAttInput')?.addEventListener('input', () => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => { currentPage = 1; loadAttendance(); }, 500); 
-    });
-
-    document.getElementById('addAttendanceForm')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const url = `${API_BASE}/attendance?student_id=${document.getElementById('addStudentId').value}&schedule_id=${document.getElementById('addScheduleId').value}&status=${document.getElementById('addStatus').value}&date=${document.getElementById('addDate').value}`;
-        const r = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-        const res = await r.json(); alert(r.ok ? res.detail : `ГРЕШКА: ${res.detail}`);
-        if (r.ok) { loadAttendance(); document.getElementById('addAttendanceForm').reset(); document.getElementById('addDate').valueAsDate = new Date(); }
-    });
-
-    async function deleteRecord(id) {
-        if (!confirm("Сигурни ли сте, че искате да изтриете този запис?")) return;
-        const r = await fetch(`${API_BASE}/attendance/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        if (r.ok) loadAttendance(); else alert(`Грешка: ${(await r.json()).detail}`);
-    }
-
-    // ================= ПОТРЕБИТЕЛИ И УЧЕБЕН ПЛАН (CREATE) =================
-    document.getElementById('clerkRoleSelector')?.addEventListener('change', (e) => {
-        const r = e.target.value;
-        document.getElementById('clerkStudentFields').classList.toggle('hidden', r !== 'student'); document.getElementById('clerkTeacherFields').classList.toggle('hidden', r !== 'teacher');
-        document.getElementById('clerkNameWrapper').classList.toggle('hidden', r === 'admin'); document.getElementById('clerkName').required = (r !== 'admin');
-    });
-
-    document.getElementById('clerkRegistrationForm')?.addEventListener('submit', async (e) => {
-        e.preventDefault(); const role = document.getElementById('clerkRoleSelector').value;
-        let url = `${API_BASE}/auth/register/student`, body = { username: document.getElementById('clerkUsername').value, password: document.getElementById('clerkPassword').value, name: document.getElementById('clerkName').value };
-        if (role === 'student') { body.faculty_number = document.getElementById('clerkFacultyNumber').value; body.rfid_uid = document.getElementById('clerkRfidUid').value; body.group_name = document.getElementById('clerkGroupName').value; body.group_year = parseInt(document.getElementById('clerkGroupYear').value); body.group_major = document.getElementById('clerkGroupMajor').value.toUpperCase(); } 
-        else if (role === 'teacher') { url = `${API_BASE}/auth/register/teacher`; body.title = document.getElementById('clerkTitle').value||null; body.department = document.getElementById('clerkDepartment').value||null; } 
-        else { url = `${API_BASE}/auth/register/admin`; delete body.name; }
-
-        const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(body) });
-        if (r.ok) { alert((await r.json()).detail); document.getElementById('clerkRegistrationForm').reset(); loadDropdownData(); } else alert(`Грешка: ${(await r.json()).detail}`);
-    });
-
-    const handlePost = (formId, endpoint, getBody) => {
-        document.getElementById(formId)?.addEventListener('submit', async (e) => {
-            e.preventDefault(); const r = await fetch(`${API_BASE}${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(getBody()) });
-            if(r.ok) { alert((await r.json()).detail); document.getElementById(formId).reset(); loadDropdownData(); } else alert(`Грешка: ${(await r.json()).detail}`);
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault(); const fd = new FormData(); fd.append("username", document.getElementById('username').value); fd.append("password", document.getElementById('password').value);
+            try {
+                const r = await fetch(`${API_BASE}/auth/login`, { method: 'POST', body: fd });
+                if (r.ok) { token = (await r.json()).access_token; localStorage.setItem("token", token); document.getElementById('loginError').classList.add('hidden'); checkAuthState(); }
+                else { document.getElementById('loginError').classList.remove('hidden'); }
+            } catch (err) { console.error(err); }
         });
-    };
-    handlePost('createCourseForm', '/admin/courses', () => ({ name: document.getElementById('courseName').value }));
-    handlePost('createGroupCourseForm', '/admin/group-courses', () => ({ group_id: parseInt(document.getElementById('gcGroupId').value), course_id: parseInt(document.getElementById('gcCourseId').value), teacher_id: parseInt(document.getElementById('gcTeacherId').value)||null, type: document.getElementById('gcType').value }));
-    handlePost('createScheduleForm', '/admin/schedules', () => ({ group_course_id: parseInt(document.getElementById('schedGcId').value), room_number: document.getElementById('schedRoom').value, day_of_week: parseInt(document.getElementById('schedDay').value), start_time: document.getElementById('schedStartTime').value, end_time: document.getElementById('schedEndTime').value, week_parity: document.getElementById('schedParity').value, start_date: document.getElementById('schedStartDate').value, end_date: document.getElementById('schedEndDate').value, subgroup: document.getElementById('schedSubgroup').value||null }));
 
-    document.getElementById('logoutBtn')?.addEventListener('click', () => {
-        token = null; userRole = null; localStorage.removeItem("token");
-        document.getElementById('dashboardSection').classList.add('hidden'); document.getElementById('loginSection').classList.remove('hidden'); document.getElementById('loginForm').reset();
-        document.getElementById('showCreateUserBtn').classList.add('hidden'); document.getElementById('teacherControls').classList.add('hidden'); document.getElementById('actionColumn').classList.add('hidden'); document.getElementById('showCurriculumBtn').classList.add('hidden');
-        navigate('attendanceView');
-    });
+        async function loadDropdownData() {
+            const h = { 'Authorization': `Bearer ${token}` };
+            try {
+                // Добавяме проверка r.ok, за да връщаме празен масив [] при грешка, вместо да крашва
+                const [grp, crs, tchr, std, gc, sch] = await Promise.all([
+                    fetch(`${API_BASE}/auth/groups`, { headers: h }).then(r => r.ok ? r.json() : []),
+                    fetch(`${API_BASE}/admin/courses`, { headers: h }).then(r => r.ok ? r.json() : []),
+                    fetch(`${API_BASE}/auth/teachers`, { headers: h }).then(r => r.ok ? r.json() : []),
+                    fetch(`${API_BASE}/auth/students`, { headers: h }).then(r => r.ok ? r.json() : []),
+                    fetch(`${API_BASE}/admin/group-courses`, { headers: h }).then(r => r.ok ? r.json() : []),
+                    fetch(`${API_BASE}/admin/schedules`, { headers: h }).then(r => r.ok ? r.json() : [])
+                ]);
+                globalData = { groups: grp, courses: crs, teachers: tchr, students: std, groupCourses: gc, schedules: sch };
+                populateDropdowns(); populateAdminLists();
+            } catch (e) { console.error("Грешка при зареждане на справочните данни:", e); }
+        }
 
-    const dInput = document.getElementById('addDate'); if(dInput) dInput.valueAsDate = new Date();
-    checkAuthState();
-</script>
+        function populateDropdowns() {
+            const fill = (id, arr, template) => {
+                const el = document.getElementById(id); if (!el) return;
+                el.innerHTML = '<option value="" disabled selected>-- Изберете --</option>';
+                arr.forEach(x => el.innerHTML += template(x));
+            };
+            fill('gcGroupId', globalData.groups, g => `<option value="${g.id}">Гр. ${g.name} (${g.major})</option>`);
+            fill('editGcGroupId', globalData.groups, g => `<option value="${g.id}">Гр. ${g.name} (${g.major})</option>`);
+            fill('gcCourseId', globalData.courses, c => `<option value="${c.id}">${c.name}</option>`);
+            fill('editGcCourseId', globalData.courses, c => `<option value="${c.id}">${c.name}</option>`);
+            fill('gcTeacherId', globalData.teachers, t => `<option value="${t.id}">${t.title || ''} ${t.name}</option>`);
+            fill('editGcTeacherId', globalData.teachers, t => `<option value="${t.id}">${t.title || ''} ${t.name}</option>`);
+            document.getElementById('gcTeacherId').innerHTML = '<option value="">-- Без преподавател --</option>' + document.getElementById('gcTeacherId').innerHTML;
+            document.getElementById('editGcTeacherId').innerHTML = '<option value="">-- Без преподавател --</option>' + document.getElementById('editGcTeacherId').innerHTML;
+
+            const tm = { 'lecture': 'Лекция', 'exercise': 'Упраж.', 'lab': 'Лаб.' };
+            fill('schedGcId', globalData.groupCourses, gc => {
+                let g = globalData.groups.find(x => x.id === gc.group_id), c = globalData.courses.find(x => x.id === gc.course_id);
+                return `<option value="${gc.id}">Гр. ${g?.name || '?'} - ${c?.name || '?'} (${tm[gc.type]})</option>`;
+            });
+
+            const fGrp = document.getElementById('filterAttGroup'); if (fGrp) {
+                fGrp.innerHTML = '<option value="" selected>-- Всички --</option>';
+                globalData.groups.forEach(g => fGrp.innerHTML += `<option value="${g.id}">Група ${g.name}</option>`);
+            }
+            renderFilteredStudents("");
+
+            const days = ["Пон", "Вто", "Сря", "Чет", "Пет", "Съб", "Нед"];
+            fill('addScheduleId', globalData.schedules, s => {
+                let gc = globalData.groupCourses.find(x => x.id === s.group_course_id);
+                let c = globalData.courses.find(x => gc && x.id === gc.course_id);
+                return `<option value="${s.id}">${c?.name || 'Предмет'} (${tm[gc?.type]}) | ${days[s.day_of_week]} ${s.start_time} (Зала ${s.room_number})</option>`;
+            });
+        }
+
+        function renderFilteredStudents(gId) {
+            const el = document.getElementById('addStudentId'); if (!el) return;
+            el.innerHTML = '<option value="" disabled selected>Изберете студент...</option>';
+            let arr = globalData.students; if (gId) arr = arr.filter(s => s.group_id == parseInt(gId));
+            arr.forEach(s => el.innerHTML += `<option value="${s.student_id}">${s.name} (ФН: ${s.faculty_number})</option>`);
+        }
+        document.getElementById('filterAttGroup')?.addEventListener('change', (e) => renderFilteredStudents(e.target.value));
+
+        function populateAdminLists() {
+            const cList = document.getElementById('coursesList'); if (cList) { cList.innerHTML = ''; globalData.courses.forEach(c => cList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-middle py-1 px-2"><span class="small">${c.name}</span><button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="openEditCourse(${c.id}, '${c.name.replace(/'/g, "\\'")}')">✏️</button></li>`); }
+            const gcList = document.getElementById('groupCoursesList'); if (gcList) { gcList.innerHTML = ''; globalData.groupCourses.forEach(gc => { let g = globalData.groups.find(x => x.id === gc.group_id); let c = globalData.courses.find(x => x.id === gc.course_id); gcList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-middle py-1 px-2"><span class="small">Гр.${g?.name} - ${c?.name}</span><button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="openEditGc(${gc.id}, ${gc.group_id}, ${gc.course_id}, ${gc.teacher_id}, '${gc.type}', ${gc.semester})">✏️</button></li>` }); }
+            const sList = document.getElementById('schedulesList'); if (sList) { sList.innerHTML = ''; globalData.schedules.forEach(s => { let gc = globalData.groupCourses.find(x => x.id === s.group_course_id); let c = globalData.courses.find(x => gc && x.id === gc.course_id); sList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-middle py-1 px-2"><span class="small">${c?.name || 'Час'} - Зала ${s.room_number}</span><button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="openEditSched(${s.id},'${s.room_number}',${s.day_of_week},'${s.start_time}','${s.end_time}','${s.is_biweekly}','${s.subgroup || ''}','${s.start_date}','${s.end_date}')">✏️</button></li>` }); }
+
+            const stdBody = document.getElementById('adminStudentsTableBody'); if (stdBody) { stdBody.innerHTML = ''; globalData.students.forEach(s => stdBody.innerHTML += `<tr><td>${s.name}</td><td>${s.faculty_number}</td><td class="text-end"><button class="btn btn-sm btn-outline-secondary py-0" onclick="openEditStudent(${s.student_id},'${s.name}','${s.faculty_number}','${s.rfid_uid}')">✏️</button></td></tr>`); }
+            const tchBody = document.getElementById('adminTeachersTableBody'); if (tchBody) { tchBody.innerHTML = ''; globalData.teachers.forEach(t => tchBody.innerHTML += `<tr><td>${t.title || ''} ${t.name}</td><td>${t.department || '-'}</td><td class="text-end"><button class="btn btn-sm btn-outline-secondary py-0" onclick="openEditTeacher(${t.id},'${t.name}','${t.title || ''}','${t.department || ''}')">✏️</button></td></tr>`); }
+            const grpBody = document.getElementById('adminGroupsTableBody'); if (grpBody) { grpBody.innerHTML = ''; globalData.groups.forEach(g => grpBody.innerHTML += `<tr><td>${g.name} (К:${g.year})</td><td>${g.major}</td><td class="text-end"><button class="btn btn-sm btn-outline-secondary py-0" onclick="openEditGroup(${g.id},'${g.name}',${g.year},'${g.major}')">✏️</button></td></tr>`); }
+        }
+
+        // ================= РЕДАКЦИЯ ОПЕРАЦИИ (MODALS + PATCH) =================
+        const patchData = async (url, body, modalId) => {
+            try {
+                const r = await fetch(API_BASE + url, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(body) });
+                if (r.ok) { bootstrap.Modal.getInstance(document.getElementById(modalId)).hide(); loadDropdownData(); loadAttendance(); } else { alert((await r.json()).detail); }
+            } catch (e) { console.error(e); }
+        };
+
+        function openEditAtt(id, st) { document.getElementById('editAttId').value = id; document.getElementById('editAttStatus').value = st; new bootstrap.Modal(document.getElementById('editAttendanceModal')).show(); }
+        document.getElementById('editAttendanceForm').addEventListener('submit', (e) => { e.preventDefault(); patchData(`/attendance/${document.getElementById('editAttId').value}`, { status: document.getElementById('editAttStatus').value }, 'editAttendanceModal'); });
+
+        function openEditGroup(id, n, y, m) { document.getElementById('editGroupId').value = id; document.getElementById('editGroupName').value = n; document.getElementById('editGroupYear').value = y; document.getElementById('editGroupMajor').value = m; new bootstrap.Modal(document.getElementById('editGroupModal')).show(); }
+        document.getElementById('editGroupForm').addEventListener('submit', (e) => { e.preventDefault(); patchData(`/admin/groups/${document.getElementById('editGroupId').value}`, { name: document.getElementById('editGroupName').value, year: parseInt(document.getElementById('editGroupYear').value), major: document.getElementById('editGroupMajor').value }, 'editGroupModal'); });
+
+        function openEditCourse(id, n) { document.getElementById('editCourseId').value = id; document.getElementById('editCourseName').value = n; new bootstrap.Modal(document.getElementById('editCourseModal')).show(); }
+        document.getElementById('editCourseForm').addEventListener('submit', (e) => { e.preventDefault(); patchData(`/admin/courses/${document.getElementById('editCourseId').value}`, { name: document.getElementById('editCourseName').value }, 'editCourseModal'); });
+
+        function openEditGc(id, gId, cId, tId, type, sem) { document.getElementById('editGcId').value = id; document.getElementById('editGcGroupId').value = gId; document.getElementById('editGcCourseId').value = cId; document.getElementById('editGcTeacherId').value = tId || ""; document.getElementById('editGcType').value = type; document.getElementById('editGcSemester').value = sem; new bootstrap.Modal(document.getElementById('editGroupCourseModal')).show(); }
+        document.getElementById('editGroupCourseForm').addEventListener('submit', (e) => { e.preventDefault(); patchData(`/admin/group-courses/${document.getElementById('editGcId').value}`, { group_id: parseInt(document.getElementById('editGcGroupId').value), course_id: parseInt(document.getElementById('editGcCourseId').value), teacher_id: parseInt(document.getElementById('editGcTeacherId').value) || 0, type: document.getElementById('editGcType').value, semester: parseInt(document.getElementById('editGcSemester').value) || null }, 'editGroupCourseModal'); });
+
+        function openEditSched(id, r, d, s, e, p, sub, sd, ed) { document.getElementById('editSchedId').value = id; document.getElementById('editSchedRoom').value = r; document.getElementById('editSchedDay').value = d; document.getElementById('editSchedStart').value = s.substring(0, 5); document.getElementById('editSchedEnd').value = e.substring(0, 5); document.getElementById('editSchedParity').value = p.toString(); document.getElementById('editSchedSub').value = sub; document.getElementById('editSchedSDate').value = sd; document.getElementById('editSchedEDate').value = ed; new bootstrap.Modal(document.getElementById('editScheduleModal')).show(); }
+        document.getElementById('editScheduleForm').addEventListener('submit', (e) => { e.preventDefault(); patchData(`/admin/schedules/${document.getElementById('editSchedId').value}`, { room_number: document.getElementById('editSchedRoom').value, day_of_week: parseInt(document.getElementById('editSchedDay').value), start_time: document.getElementById('editSchedStart').value, end_time: document.getElementById('editSchedEnd').value, is_biweekly: document.getElementById('editSchedParity').value === 'true', subgroup: document.getElementById('editSchedSub').value || "", start_date: document.getElementById('editSchedSDate').value, end_date: document.getElementById('editSchedEDate').value }, 'editScheduleModal'); });
+        function openEditStudent(id, n, fn, rfid) { document.getElementById('editStudentId').value = id; document.getElementById('editStudentName').value = n; document.getElementById('editStudentFN').value = fn; document.getElementById('editStudentRFID').value = rfid; document.getElementById('editStudentGName').value = ''; document.getElementById('editStudentGYear').value = ''; document.getElementById('editStudentGMajor').value = ''; new bootstrap.Modal(document.getElementById('editStudentModal')).show(); }
+        document.getElementById('editStudentForm').addEventListener('submit', (e) => { e.preventDefault(); patchData(`/auth/students/${document.getElementById('editStudentId').value}`, { name: document.getElementById('editStudentName').value, faculty_number: document.getElementById('editStudentFN').value, rfid_uid: document.getElementById('editStudentRFID').value, group_name: document.getElementById('editStudentGName').value || null, group_year: parseInt(document.getElementById('editStudentGYear').value) || null, group_major: document.getElementById('editStudentGMajor').value || null }, 'editStudentModal'); });
+
+        function openEditTeacher(id, n, t, d) { document.getElementById('editTeacherId').value = id; document.getElementById('editTeacherName').value = n; document.getElementById('editTeacherTitle').value = t; document.getElementById('editTeacherDept').value = d; new bootstrap.Modal(document.getElementById('editTeacherModal')).show(); }
+        document.getElementById('editTeacherForm').addEventListener('submit', (e) => { e.preventDefault(); patchData(`/auth/teachers/${document.getElementById('editTeacherId').value}`, { name: document.getElementById('editTeacherName').value, title: document.getElementById('editTeacherTitle').value, department: document.getElementById('editTeacherDept').value }, 'editTeacherModal'); });
+
+
+        // ================= ПРИСЪСТВИЯ (GET ПАГИНАЦИЯ + ТЪРСЕНЕ) =================
+        async function loadAttendance() {
+            try {
+                const searchEl = document.getElementById('searchAttInput');
+                const searchQuery = searchEl ? searchEl.value : '';
+                const skip = (currentPage - 1) * itemsPerPage;
+
+                let url = `${API_BASE}/attendance?skip=${skip}&limit=${itemsPerPage}`;
+                if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+                const r = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await r.json();
+
+                const tbody = document.getElementById('attendanceTableBody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                // Защита за елементите на пагинацията
+                const totalRecordsEl = document.getElementById('attTotalRecords');
+                const pageInfoEl = document.getElementById('attPageInfo');
+                const btnPrev = document.getElementById('btnPrevPage');
+                const btnNext = document.getElementById('btnNextPage');
+
+                const totalPages = Math.ceil(data.total / itemsPerPage) || 1;
+                if (totalRecordsEl) totalRecordsEl.innerText = `Общо: ${data.total} записа`;
+                if (pageInfoEl) pageInfoEl.innerText = `Стр. ${currentPage} от ${totalPages}`;
+                if (btnPrev) btnPrev.disabled = (currentPage === 1);
+                if (btnNext) btnNext.disabled = (currentPage === totalPages);
+
+                const currUser = parseJwt(token)?.sub || '';
+
+                if (!data.items || data.items.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Няма намерени записи.</td></tr>`;
+                    return;
+                }
+
+                data.items.forEach(att => {
+                    const tr = document.createElement('tr');
+                    let badge = att.status === 'present' ? 'bg-success' : (att.status === 'makeup' ? 'bg-warning text-dark' : 'bg-info text-dark');
+                    let text = att.status === 'present' ? 'Присъствие' : (att.status === 'makeup' ? 'Отработване' : 'Извинено');
+                    let source = att.recorded_by === 'Автоматичен' ? '<strong class="text-primary">🤖 Автоматичен</strong>' : `<span class="text-muted">✍️ Ръчно: <b>${att.recorded_by}</b></span>`;
+
+                    let canEditDel = userRole === 'admin' || (userRole === 'teacher' && (att.recorded_by === 'Автоматичен' || att.recorded_by === currUser));
+                    let actionBtns = canEditDel ? `<button class="btn btn-sm btn-outline-primary py-0 me-1" onclick="openEditAtt(${att.id}, '${att.status}')">✏️</button><button class="btn btn-sm btn-outline-danger py-0" onclick="deleteRecord(${att.id})">❌</button>` : '';
+
+                    tr.innerHTML = `<td>${new Date(att.timestamp).toLocaleString('bg-BG')}</td><td><b>${att.student_name}</b></td><td>${att.course_name}</td><td><span class="badge ${badge}">${text}</span></td><td>${source}</td><td class="text-center px-3 ${userRole === 'student' ? 'hidden' : ''}">${actionBtns}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) { console.error("Error in loadAttendance:", err); }
+        }
+
+        document.getElementById('btnPrevPage')?.addEventListener('click', () => { if (currentPage > 1) { currentPage--; loadAttendance(); } });
+        document.getElementById('btnNextPage')?.addEventListener('click', () => { currentPage++; loadAttendance(); });
+
+        document.getElementById('searchAttInput')?.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => { currentPage = 1; loadAttendance(); }, 500);
+        });
+
+        document.getElementById('addAttendanceForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = `${API_BASE}/attendance?student_id=${document.getElementById('addStudentId').value}&schedule_id=${document.getElementById('addScheduleId').value}&status=${document.getElementById('addStatus').value}&date=${document.getElementById('addDate').value}`;
+            const r = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+            const res = await r.json(); alert(r.ok ? res.detail : `ГРЕШКА: ${res.detail}`);
+            if (r.ok) { loadAttendance(); document.getElementById('addAttendanceForm').reset(); document.getElementById('addDate').valueAsDate = new Date(); }
+        });
+
+        async function deleteRecord(id) {
+            if (!confirm("Сигурни ли сте, че искате да изтриете този запис?")) return;
+            const r = await fetch(`${API_BASE}/attendance/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            if (r.ok) loadAttendance(); else alert(`Грешка: ${(await r.json()).detail}`);
+        }
+
+        // ================= ПОТРЕБИТЕЛИ И УЧЕБЕН ПЛАН (CREATE) =================
+        document.getElementById('clerkRoleSelector')?.addEventListener('change', (e) => {
+            const r = e.target.value;
+            document.getElementById('clerkStudentFields').classList.toggle('hidden', r !== 'student'); document.getElementById('clerkTeacherFields').classList.toggle('hidden', r !== 'teacher');
+            document.getElementById('clerkNameWrapper').classList.toggle('hidden', r === 'admin'); document.getElementById('clerkName').required = (r !== 'admin');
+        });
+
+        document.getElementById('clerkRegistrationForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault(); const role = document.getElementById('clerkRoleSelector').value;
+            let url = `${API_BASE}/auth/register/student`, body = { username: document.getElementById('clerkUsername').value, password: document.getElementById('clerkPassword').value, name: document.getElementById('clerkName').value };
+            if (role === 'student') { body.faculty_number = document.getElementById('clerkFacultyNumber').value; body.rfid_uid = document.getElementById('clerkRfidUid').value; body.group_name = document.getElementById('clerkGroupName').value; body.group_year = parseInt(document.getElementById('clerkGroupYear').value); body.group_major = document.getElementById('clerkGroupMajor').value.toUpperCase(); }
+            else if (role === 'teacher') { url = `${API_BASE}/auth/register/teacher`; body.title = document.getElementById('clerkTitle').value || null; body.department = document.getElementById('clerkDepartment').value || null; }
+            else { url = `${API_BASE}/auth/register/admin`; delete body.name; }
+
+            const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(body) });
+            if (r.ok) { alert((await r.json()).detail); document.getElementById('clerkRegistrationForm').reset(); loadDropdownData(); } else alert(`Грешка: ${(await r.json()).detail}`);
+        });
+
+        const handlePost = (formId, endpoint, getBody) => {
+            document.getElementById(formId)?.addEventListener('submit', async (e) => {
+                e.preventDefault(); const r = await fetch(`${API_BASE}${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(getBody()) });
+                if (r.ok) { alert((await r.json()).detail); document.getElementById(formId).reset(); loadDropdownData(); } else alert(`Грешка: ${(await r.json()).detail}`);
+            });
+        };
+        handlePost('createCourseForm', '/admin/courses', () => ({ name: document.getElementById('courseName').value }));
+        handlePost('createGroupCourseForm', '/admin/group-courses', () => ({ group_id: parseInt(document.getElementById('gcGroupId').value), course_id: parseInt(document.getElementById('gcCourseId').value), teacher_id: parseInt(document.getElementById('gcTeacherId').value) || null, type: document.getElementById('gcType').value }));
+        handlePost('createScheduleForm', '/admin/schedules', () => ({ group_course_id: parseInt(document.getElementById('schedGcId').value), room_number: document.getElementById('schedRoom').value, day_of_week: parseInt(document.getElementById('schedDay').value), start_time: document.getElementById('schedStartTime').value, end_time: document.getElementById('schedEndTime').value, is_biweekly: document.getElementById('schedParity').value === 'true', start_date: document.getElementById('schedStartDate').value, end_date: document.getElementById('schedEndDate').value, subgroup: document.getElementById('schedSubgroup').value || null }));
+        document.getElementById('logoutBtn')?.addEventListener('click', () => {
+            token = null; userRole = null; localStorage.removeItem("token");
+            document.getElementById('dashboardSection').classList.add('hidden'); document.getElementById('loginSection').classList.remove('hidden'); document.getElementById('loginForm').reset();
+            document.getElementById('showCreateUserBtn').classList.add('hidden'); document.getElementById('teacherControls').classList.add('hidden'); document.getElementById('actionColumn').classList.add('hidden'); document.getElementById('showCurriculumBtn').classList.add('hidden');
+            navigate('attendanceView');
+        });
+
+        const dInput = document.getElementById('addDate'); if (dInput) dInput.valueAsDate = new Date();
+        checkAuthState();
+    </script>
 </body>
+
 </html>
