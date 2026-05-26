@@ -114,6 +114,22 @@ async def create_schedule_slot(payload: ScheduleCreate, db: AsyncSession = Depen
         
     return {"detail": "Новото занятие е въведено успешно в графика на залата."}
 
+@router.post("/groups", dependencies=[Depends(require_role("admin"))])
+async def create_group(payload: GroupUpdate, db: AsyncSession = Depends(get_async_session)):
+    if not payload.name or not payload.year or not payload.major:
+        raise HTTPException(status_code=400, detail="Всички полета са задължителни.")
+    res = await db.execute(select(Group).where(and_(
+        Group.name == payload.name,
+        Group.year == payload.year,
+        Group.major == payload.major
+    )))
+    if res.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Тази група вече съществува.")
+    new_group = Group(name=payload.name, year=payload.year, major=payload.major)
+    db.add(new_group)
+    await db.commit()
+    return {"detail": f"Група {payload.name} (К.{payload.year}, {payload.major}) е създадена."}
+
 @router.patch("/groups/{group_id}", dependencies=[Depends(require_role("admin"))])
 async def update_group(group_id: int, payload: GroupUpdate, db: AsyncSession = Depends(get_async_session)):
     group = await db.get(Group, group_id)
