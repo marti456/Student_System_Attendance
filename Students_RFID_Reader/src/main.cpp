@@ -155,51 +155,37 @@ void sendToServer(const String& nfcPayload) {
 // Стратегия: Четем символи, докато не срещнем 0x00 (терминатор) или не свърши буферът.
 String parsePayload(uint8_t* response, uint8_t responseLen) {
     String textHeader = "";
-    int secondPipeIndex = -1;
+    int hmacStartOffset = -1;
     int pipeCount = 0;
-    int hmacStartOffset = 0;
 
-    // 1. Извличаме текстовата част до втория разделител '|'
+    // 1. Извличаме текстовата част ("ФН|ATC|") до втория разделител '|'
     for (int i = 0; i < (int)responseLen; i++) {
         char c = (char)response[i];
         textHeader += c;
         if (c == '|') {
             pipeCount++;
             if (pipeCount == 2) {
-                secondPipeIndex = i;
-                hmacStartOffset = i + 1; // HMAC суровите байтове започват веднага след втория '|'
+                hmacStartOffset = i + 1; // Суровите байтове на HMAC започват веднага тук
                 break;
             }
         }
     }
 
-    // Ако не сме намерили два пайпа, пакетът е невалиден
-    if (secondPipeIndex == -1) {
-        Serial.println("Грешка: Неуспешно откриване на текстовите разделители.");
+    // Валидация: Ако липсват двата пайпа, пакетът е тотално дефектен
+    if (hmacStartOffset == -1 || hmacStartOffset + 32 > responseLen) {
         return "";
     }
 
-    // 2. Четем следващите 32 байта (суровия HMAC-SHA256) и ги конвертираме в Hex текст
+    // 2. Взимаме следващите точно 32 байта и ги превръщаме в Hex текст за FastAPI
     String hmacHex = "";
     for (int i = 0; i < 32; i++) {
-        int bytePos = hmacStartOffset + i;
-        
-        // Защита от излизане извън реално прочетения буфер
-        if (bytePos >= responseLen) {
-            Serial.println("Грешка: Буферът свърши преди да прочетем 32-та байта на HMAC.");
-            return "";
-        }
-        
         char buf[3];
-        sprintf(buf, "%02x", response[bytePos]); // В lowercase hex за FastAPI
+        sprintf(buf, "%02x", response[hmacStartOffset + i]);
         hmacHex += buf;
     }
 
-    // 3. Сглобяваме финалния низ във формат "ФН|ATC|64_символа_HEX"
-    String finalPayload = textHeader + hmacHex;
-    
-    Serial.println("Успешно декодиран цялостен payload: " + finalPayload);
-    return finalPayload;
+    // Връщаме чистия, сглобен стринг, готов за FastAPI
+    return textHeader + hmacHex;
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -244,70 +230,42 @@ void setup() {
 
 // ── Loop ──────────────────────────────────────────────────────────────────────
 void loop() {
-    //Serial.println("Waiting...");
+    Serial.println("Waiting for phone...");
 
-    // inListPassiveTarget() активира ISO-DEP (ISO 14443-4) протокола,
-    // което е задължително за APDU комуникация с Android HCE.
-    // readPassiveTargetID() спира само на ISO 14443-3 (UID четене) и
-    // не може да изпраща APDU команди след това.
-    if (!nfc.inListPassiveTarget()) return;
-
-    Serial.println("Phone/card detected!");
-
-    uint8_t response[255];
-    uint8_t responseLen;
-    bool ok = false;
-
-    // Опитваме до 3 пъти — понякога Android HCE има кратко закъснение
-    // при първото докосване (инициализация на услугата).
-    for (int attempt = 1; attempt <= 3; attempt++) {
-        responseLen = sizeof(response);
-        ok = nfc.inDataExchange(
-            (uint8_t*)SELECT_AID_APDU, sizeof(SELECT_AID_APDU),
-            response, &responseLen
-        );
-        if (ok) {
-            Serial.printf("OK на attempt %d\n", attempt);
-            break;
-        }
-        Serial.printf("Attempt %d failed, retrying...\n", attempt);
-        delay(80);
-    }
-
-    if (!ok) {
-        // Дори при FAIL понякога има частичен отговор в буфера —
-        // опитваме да парснем и него.
-        Serial.println("inDataExchange failed — опитваме парсване на буфера...");
-        // responseLen при FAIL е непроменен (255) — не го ползваме директно,
-        // а търсим до първия валиден 0x00 или 90 00 в разумни граници (80 байта).
-        uint8_t safeLen = 80;
-        String payload = parsePayload(response, safeLen);
-        if (payload.length() > 0) {
-            Serial.println("Payload от partial response: " + payload);
-            sendToServer(payload);
-            delay(3000);
-        } else {
-            Serial.println("Парсването неуспешно. Raw (първи 80 байта):");
-            for (int i = 0; i < safeLen; i++) Serial.printf("%02X ", response[i]);
-            Serial.println();
-            signalError();
-            delay(1000);
-        }
+    // Активираме ISO-DEP (ISO 14443-4) протокола
+    if (!nfc.inListPassiveTarget()) {
+        delay(100); // Кратка пауза, за да не претоварваме процесора
         return;
     }
 
-    // Парсваме payload от успешния response
+    Serial.println("Phone detected!");
+
+    uint8_t response[64]; // Понеже пакетът е къс (~45 байта), 64 байта буфер ни е напълно достатъчен
+    uint8_t responseLen = sizeof(response);
+
+    // Правим САМО ЕДИН чист и директен опит за обмен на данни
+    bool success = nfc.inDataExchange(
+        (uint8_t*)SELECT_AID_APDU, sizeof(SELECT_AID_APDU),
+        response, &responseLen
+    );
+
+    if (!success) {
+        Serial.println("NFC Транзакцията се провали хардуерно.");
+        signalError(); // Директна сигнализация за грешка
+        delay(1000);   // Пауза, за да може студентът да си дръпне телефона
+        return;
+    }
+
+    // Опит за парсване на прочетените данни
     String payload = parsePayload(response, responseLen);
 
     if (payload.length() > 0) {
-        Serial.println("Success! Payload: " + payload);
-        sendToServer(payload);
-        delay(3000);
+        Serial.println("Успешно декодиран пакет: " + payload);
+        sendToServer(payload); // Изпращаме към FastAPI
+        delay(3000);           // Голяма пауза след успех, за да предотвратим двойно чекиране
     } else {
-        Serial.print("Парсването неуспешно. Raw response: ");
-        for (int i = 0; i < responseLen; i++) Serial.printf("%02X ", response[i]);
-        Serial.println();
-        signalError();
-        delay(1000);
+        Serial.println("Грешка при парсване на данните (невалиден формат).");
+        signalError(); //
+        delay(1000);   //
     }
 }
