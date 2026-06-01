@@ -154,39 +154,82 @@ void sendToServer(const String& nfcPayload) {
 // Очакван формат от Android: ASCII_payload + 0x00 + 0x90 + 0x00
 // Стратегия: Четем символи, докато не срещнем 0x00 (терминатор) или не свърши буферът.
 String parsePayload(uint8_t* response, uint8_t responseLen) {
-    String textHeader = "";
-    int hmacStartOffset = -1;
-    int pipeCount = 0;
-
-    // 1. Извличаме текстовата част ("ФН|ATC|") до втория разделител '|'
-    for (int i = 0; i < (int)responseLen; i++) {
-        char c = (char)response[i];
-        textHeader += c;
-        if (c == '|') {
-            pipeCount++;
-            if (pipeCount == 2) {
-                hmacStartOffset = i + 1; // Суровите байтове на HMAC започват веднага тук
-                break;
-            }
-        }
-    }
-
-    // Валидация: Ако липсват двата пайпа, пакетът е тотално дефектен
-    if (hmacStartOffset == -1 || hmacStartOffset + 32 > responseLen) {
+    if (responseLen < 38) { // Минимален възможен размер (1 + 1 за ФН + 4 + 32)
+        Serial.println("Грешка: Пакетът е твърде къс.");
         return "";
     }
 
-    // 2. Взимаме следващите точно 32 байта и ги превръщаме в Hex текст за FastAPI
+    // 1. Четем първия байт, за да разберем дължината на факултетния номер
+    uint8_t fnLength = response[0];
+    
+    // Защитна проверка за препълване на буфера
+    if (1 + fnLength + 4 + 32 > responseLen) {
+        Serial.println("Грешка: Несъответствие в дължината на пакета.");
+        return "";
+    }
+
+    // 2. Извличаме факултетния номер като текст (запазваме водещите нули!)
+    String facultyNumber = "";
+    for (int i = 0; i < fnLength; i++) {
+        facultyNumber += (char)response[1 + i];
+    }
+
+    // 3. Намираме къде започва ATC (веднага след ФН)
+    int atcOffset = 1 + fnLength;
+    uint32_t atc = (response[atcOffset] << 24) | 
+                   (response[atcOffset + 1] << 16) | 
+                   (response[atcOffset + 2] << 8) | 
+                   response[atcOffset + 3];
+
+    // 4. Намираме къде започва HMAC (веднага след ATC)
+    int hmacOffset = atcOffset + 4;
     String hmacHex = "";
     for (int i = 0; i < 32; i++) {
         char buf[3];
-        sprintf(buf, "%02x", response[hmacStartOffset + i]);
+        sprintf(buf, "%02x", response[hmacOffset + i]);
         hmacHex += buf;
     }
 
-    // Връщаме чистия, сглобен стринг, готов за FastAPI
-    return textHeader + hmacHex;
+    // 5. Сглобяваме финалния стринг за FastAPI
+    String finalPayload = facultyNumber + "|" + String(atc) + "|" + hmacHex;
+    
+    Serial.println("Успешно декодиран динамичен пакет: " + finalPayload);
+    return finalPayload;
 }
+// String parsePayload(uint8_t* response, uint8_t responseLen) {
+//     String textHeader = "";
+//     int hmacStartOffset = -1;
+//     int pipeCount = 0;
+
+//     // 1. Извличаме текстовата част ("ФН|ATC|") до втория разделител '|'
+//     for (int i = 0; i < (int)responseLen; i++) {
+//         char c = (char)response[i];
+//         textHeader += c;
+//         if (c == '|') {
+//             pipeCount++;
+//             if (pipeCount == 2) {
+//                 hmacStartOffset = i + 1; // Суровите байтове на HMAC започват веднага тук
+//                 break;
+//             }
+//         }
+//     }
+
+//     // Валидация: Ако липсват двата пайпа, пакетът е тотално дефектен
+//     if (hmacStartOffset == -1 || hmacStartOffset + 32 > responseLen) {
+//         return "";
+//     }
+
+//     // 2. Взимаме следващите точно 32 байта и ги превръщаме в Hex текст за FastAPI
+//     String hmacHex = "";
+//     for (int i = 0; i < 32; i++) {
+//         char buf[3];
+//         sprintf(buf, "%02x", response[hmacStartOffset + i]);
+//         hmacHex += buf;
+//     }
+
+//     // Връщаме чистия, сглобен стринг, готов за FastAPI
+//     return textHeader + hmacHex;
+// }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
@@ -230,7 +273,7 @@ void setup() {
 
 // ── Loop ──────────────────────────────────────────────────────────────────────
 void loop() {
-    Serial.println("Waiting for phone...");
+    //Serial.println("Waiting for phone...");
 
     // Активираме ISO-DEP (ISO 14443-4) протокола
     if (!nfc.inListPassiveTarget()) {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.nfc.cardemulation.HostApduService
 import android.os.Bundle
 import android.util.Log
+import java.nio.ByteBuffer
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -52,28 +53,56 @@ class NfcHceService : HostApduService() {
         }
     }
 
+//    private fun handleSelectAid(): ByteArray {
+//        val prefs = StudentPrefs(this)
+//        val facultyNumber = prefs.facultyNumber ?: return SW_NOT_FOUND
+//        val hmacKeyHex = prefs.hmacKey ?: return SW_NOT_FOUND
+//        val atc = prefs.getAndIncrementAtc()
+//
+//        val message = "$facultyNumber|$atc"
+//
+//        // 1. Изчисляваме HMAC-SHA256 като СУРОВИ БАЙТОВЕ (точно 32 байта)
+//        val hmacRawBytes = computeHmacSha256Raw(message, hmacKeyHex)
+//
+//        // 2. Текстовият хедър: "ФН|ATC|"
+//        val textHeaderBytes = "$facultyNumber|$atc|".toByteArray(Charsets.UTF_8)
+//
+//        // 3. Сглобяваме: Текст (напр. 13 байта) + HMAC (32 байта) + Терминатор (1 байт) + SW_OK (2 байта)
+//        // Обща дължина: ~48 байта. Влиза перфектно под хардуерния лимит от 64!
+//        val responseBytes = textHeaderBytes + hmacRawBytes + byteArrayOf(0x00) + SW_OK
+//
+//        Log.d(TAG, "Успешно изпратени ${responseBytes.size} байта към четеца.")
+//        return responseBytes
+//    }
     private fun handleSelectAid(): ByteArray {
         val prefs = StudentPrefs(this)
-        val facultyNumber = prefs.facultyNumber ?: return SW_NOT_FOUND
+        val facultyNumberStr = prefs.facultyNumber ?: return SW_NOT_FOUND
         val hmacKeyHex = prefs.hmacKey ?: return SW_NOT_FOUND
         val atc = prefs.getAndIncrementAtc()
 
-        val message = "$facultyNumber|$atc"
+        // 1. Взимаме текстовите байтове на ФН (пази водещите нули)
+        val fnBytes = facultyNumberStr.toByteArray(Charsets.UTF_8)
+        val fnLength = fnBytes.size // Дължината на номера (напр. 9 или 11 байта)
 
-        // 1. Изчисляваме HMAC-SHA256 като СУРОВИ БАЙТОВЕ (точно 32 байта)
-        val hmacRawBytes = computeHmacSha256Raw(message, hmacKeyHex)
+        // 2. Изчисляваме суровия HMAC върху "ФН|ATC" за FastAPI
+        val message = "$facultyNumberStr|$atc"
+        val keyBytes = hmacKeyHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(keyBytes, "HmacSHA256"))
+        val hmacBytes = mac.doFinal(message.toByteArray(Charsets.UTF_8)) // 32 байта
 
-        // 2. Текстовият хедър: "ФН|ATC|"
-        val textHeaderBytes = "$facultyNumber|$atc|".toByteArray(Charsets.UTF_8)
+        // 3. Заделяме буфер: 1 байт (дължина) + Х байта (ФН) + 4 байта (ATC) + 32 байта (HMAC)
+        val totalSize = 1 + fnLength + 4 + 32
+        val buffer = ByteBuffer.allocate(totalSize)
 
-        // 3. Сглобяваме: Текст (напр. 13 байта) + HMAC (32 байта) + Терминатор (1 байт) + SW_OK (2 байта)
-        // Обща дължина: ~48 байта. Влиза перфектно под хардуерния лимит от 64!
-        val responseBytes = textHeaderBytes + hmacRawBytes + byteArrayOf(0x00) + SW_OK
+        buffer.put(fnLength.toByte()) // 1 байт за дължината
+        buffer.put(fnBytes)           // Х байта за самия номер
+        buffer.putInt(atc.toInt())    // 4 байта за ATC
+        buffer.put(hmacBytes)         // 32 байта за HMAC
 
-        Log.d(TAG, "Успешно изпратени ${responseBytes.size} байта към четеца.")
-        return responseBytes
+        // Общ размер: около 46-48 байта. Преминава хардуерния лимит перфектно!
+        return buffer.array() + SW_OK
     }
-
     private fun isOurSelectAid(apdu: ByteArray): Boolean {
         if (apdu.size < SELECT_HEADER.size + 1 + OUR_AID.size) return false
         for (i in SELECT_HEADER.indices) {
