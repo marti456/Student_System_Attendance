@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional
 import datetime
 
@@ -79,6 +79,13 @@ class AttendanceOut(BaseModel):
 
 class AttendanceUpdate(BaseModel):
     status: Optional[str] = None
+    
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v):
+        if v is not None and v not in {"Присъствие", "Отработване", "Извинено"}:
+            raise ValueError("Невалиден статус. Позволени: Присъствие, Отработване, Извинено")
+        return v
 
 class PaginatedAttendanceOut(BaseModel):
     total: int

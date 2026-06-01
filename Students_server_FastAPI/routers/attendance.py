@@ -12,6 +12,9 @@ from models import Course, GroupCourse, Student, Schedule, Attendance
 from schemas import AttendanceUpdate, CheckinIn, AttendanceOut, PaginatedAttendanceOut
 from auth import get_current_user, require_any_role, get_async_session
 
+MAX_ATC_WINDOW = 100
+VALID_STATUSES = {"Присъствие", "Отработване", "Извинено"}
+
 router = APIRouter()
 
 
@@ -63,15 +66,17 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
             status_code=403,
             detail=f"Невалиден ATC ({atc} ≤ {student.atc_counter}). Повторно изпращане?"
         )
-
+    
+    if atc > student.atc_counter + MAX_ATC_WINDOW:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Десинхронизация на ATC! Разликата е твърде голяма ({atc} > {student.atc_counter} + {MAX_ATC_WINDOW})."
+        )
     # 4. Верификация на HMAC подписа
     if not _verify_hmac(student.hmac_key, faculty_number, atc, signature):
         raise HTTPException(status_code=403, detail="Невалиден криптографски подпис.")
 
-    # 5. Обновяване на ATC брояча (преди да запишем присъствието)
-    student.atc_counter = atc
-
-    # 6. Намиране на активния график в тази зала
+    # 5. Намиране на активния график в тази зала
     now      = datetime.datetime.now()
     now_date = now.date()
     now_time = now.time()
@@ -114,7 +119,7 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
     if not matched_schedule:
         raise HTTPException(status_code=404, detail="В момента няма активно занятие в тази зала.")
 
-    # 7. Проверка за дублиране за СЪЩИЯ предмет и тип днес
+    # 6. Проверка за дублиране за СЪЩИЯ предмет и тип днес
     stmt_dup = (
         select(Attendance)
         .join(Schedule,    Attendance.schedule_id == Schedule.id)
@@ -131,7 +136,7 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
     if (await db.execute(stmt_dup)).scalars().first():
         raise HTTPException(status_code=403, detail="Вече сте се отчели за този урок днес.")
 
-    # 8. Записване на присъствието
+    # 7. Записване на присъствието
     status_text = (
         "Присъствие"
         if student.group_id == matched_schedule.group_course.group_id
@@ -144,6 +149,8 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
         status      = status_text,
         recorded_by = "Автоматичен",
     )
+    # Обновяване на ATC брояча (преди да запишем присъствието)
+    student.atc_counter = atc
     db.add(att)
     try:
         await db.commit()
@@ -223,6 +230,8 @@ async def add_attendance(
     db: AsyncSession = Depends(get_async_session),
     current_user = Depends(get_current_user),
 ):
+    if status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail="Невалиден статус. Позволени: Присъствие, Отработване, Извинено")
     res_sched = await db.execute(
         select(Schedule).options(joinedload(Schedule.group_course)).where(Schedule.id == schedule_id)
     )
