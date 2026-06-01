@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="32dp"
+    android:gravity="center">
+
+    <!-- Анимирана NFC иконка -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📱"
+        android:textSize="80sp"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- Факултетен номер -->
+    <TextView
+        android:id="@+id/tvFacultyNumber"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#212121"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- NFC статус -->
+    <TextView
+        android:id="@+id/tvNfcStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="15sp"
+        android:gravity="center"
+        android:lineSpacingExtra="4dp"
+        android:layout_marginBottom="32dp"/>
+
+    <!-- Разделителна линия -->
+    <View
+        android:layout_width="200dp"
+        android:layout_height="1dp"
+        android:background="#E0E0E0"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- ATC брояч -->
+    <TextView
+        android:id="@+id/tvAtcInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#9E9E9E"
+        android:layout_marginBottom="40dp"/>
+
+    <!-- Бутон за изход -->
+    <Button
+        android:id="@+id/btnLogout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Изход"
+        android:backgroundTint="#F44336"
+        android:textColor="@android:color/white"
+        android:paddingHorizontal="32dp"/>
+
+</LinearLayout>

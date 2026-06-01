@@ -1,229 +1,240 @@
+import os
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select
-from models import AsyncSessionLocal, Student, Teacher, User, engine_url, Group
-from schemas import GroupOut, StudentOut, StudentUpdate, TeacherOut, TeacherUpdate, Token, TokenData
-from typing import List, Optional, Callable
-from schemas import Token, TokenData, UserCreate, UserOut, StudentRegisterIn, TeacherRegisterIn, AdminRegisterIn
+from typing import List, Optional
 
-# secret for signing tokens (change in production)
+from models import AsyncSessionLocal, Student, Teacher, User, engine_url, Group
+from schemas import (
+    GroupOut, StudentOut, StudentUpdate, TeacherOut, TeacherUpdate,
+    Token, TokenData, UserCreate, UserOut,
+    StudentRegisterIn, TeacherRegisterIn, AdminRegisterIn,
+    ProvisionKeyOut,
+)
+
 SECRET_KEY = "CHANGE_ME_TO_A_RANDOM_SECRET"
-ALGORITHM = "HS256"
+ALGORITHM  = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
 router = APIRouter()
+
 
 async def get_async_session() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         yield session
 
+
 async def authenticate_user(db: AsyncSession, username: str, password: str) -> Optional[User]:
-    res = await db.execute(select(User).where(User.username == username))
+    res  = await db.execute(select(User).where(User.username == username))
     user = res.scalar_one_or_none()
-    if not user:
-        return None
-    if not user.verify_password(password):
+    if not user or not user.verify_password(password):
         return None
     return user
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now() + expires_delta
-    else:
-        expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire    = datetime.now() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_async_session)):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_async_session),
+):
     user = await authenticate_user(db, form_data.username, form_data.password)
     if not user:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-    token_data = {"sub": user.username, "role": user.role, "user_id": user.id}
-    access_token = create_access_token(token_data)
-    return {"access_token": access_token, "token_type": "bearer"}
+        raise HTTPException(status_code=401, detail="Грешно потребителско име или парола.")
+    token = create_access_token({"sub": user.username, "role": user.role, "user_id": user.id})
+    return {"access_token": token, "token_type": "bearer"}
 
-# Dependency: get current user
-async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_async_session)) -> User:
-    credentials_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db:    AsyncSession = Depends(get_async_session),
+) -> User:
+    exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалиден токен.")
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
+        payload  = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
         if username is None:
-            raise credentials_exception
+            raise exc
     except JWTError:
-        raise credentials_exception
-    res = await db.execute(select(User).where(User.username == username))
+        raise exc
+    res  = await db.execute(select(User).where(User.username == username))
     user = res.scalar_one_or_none()
     if user is None:
-        raise credentials_exception
+        raise exc
     return user
 
+
 def require_role(role: str):
-    async def role_checker(current_user: User = Depends(get_current_user)):
+    async def checker(current_user: User = Depends(get_current_user)):
         if current_user.role != role and current_user.role != "admin":
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
+            raise HTTPException(status_code=403, detail="Недостатъчни права.")
         return current_user
-    return role_checker
+    return checker
+
 
 def require_any_role(roles: list):
     async def checker(current_user: User = Depends(get_current_user)):
         if current_user.role not in roles and current_user.role != "admin":
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
+            raise HTTPException(status_code=403, detail="Недостатъчни права.")
         return current_user
     return checker
 
-# @router.post("/users", response_model=UserOut, dependencies=[Depends(require_role("admin"))])
-# async def create_new_user(
-#     user_data: UserCreate, 
-#     db: AsyncSession = Depends(get_async_session)
-# ):
-#     res = await db.execute(select(User).where(User.username == user_data.username))
-#     if res.scalar_one_or_none():
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST, 
-#             detail="Потребителското име вече е заето"
-#         )
 
-#     hashed_password = User.hash_password(user_data.password)
+# ──────────────────────────────────────────────
+# НОВ ENDPOINT: Провизиониране на HMAC ключ
+# ──────────────────────────────────────────────
 
-#     new_user = User(
-#         username=user_data.username,
-#         password_hash=hashed_password,
-#         role=user_data.role,
-#         linked_student_id=user_data.linked_student_id
-#     )
+@router.post("/provision-key", response_model=ProvisionKeyOut)
+async def provision_key(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Извиква се от Android приложението веднага след успешен логин.
+    Генерира (при нужда) уникален HMAC ключ за студента и го връща.
+    Ключът се пази в Android Keystore — никога не напуска телефона след това.
+    """
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Само студенти могат да получат NFC ключ.")
 
-#     db.add(new_user)
-#     try:
-#         await db.commit()
-#         await db.refresh(new_user)
-#     except Exception:
-#         await db.rollback()
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-#             detail="Грешка при запис в базата данни"
-#         )
+    if not current_user.linked_student_id:
+        raise HTTPException(status_code=400, detail="Акаунтът не е свързан с профил на студент.")
 
-#     return new_user
+    student = await db.get(Student, current_user.linked_student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+
+    if not student.hmac_key:
+        # Генерираме 32 криптографски случайни байта (256-bit ключ)
+        student.hmac_key = secrets.token_hex(32)
+        student.atc_counter = 0
+        await db.commit()
+        await db.refresh(student)
+
+    return ProvisionKeyOut(
+        hmac_key       = student.hmac_key,
+        faculty_number = student.faculty_number,
+        atc            = student.atc_counter,
+    )
+
+
+@router.post("/provision-key/reset", dependencies=[Depends(require_role("admin"))])
+async def reset_provision_key(
+    student_id: int,
+    db: AsyncSession = Depends(get_async_session),
+):
+    """
+    Само за администратор: нулира ключа на студент (напр. при смяна на телефон).
+    При следващ /provision-key от студента ще се генерира нов ключ.
+    """
+    student = await db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+
+    student.hmac_key    = None
+    student.atc_counter = 0
+    await db.commit()
+    return {"detail": f"HMAC ключът на студент {student.faculty_number} е нулиран."}
+
+
+# ──────────────────────────────────────────────
+# РЕГИСТРАЦИИ
+# ──────────────────────────────────────────────
 
 @router.post("/register/student", dependencies=[Depends(require_role("admin"))])
 async def register_student(payload: StudentRegisterIn, db: AsyncSession = Depends(get_async_session)):
-    # 1. Проверки за дублиране на потребител или факултетен номер
-    user_exists = await db.execute(select(User).where(User.username == payload.username))
-    if user_exists.scalar_one_or_none():
+    if (await db.execute(select(User).where(User.username == payload.username))).scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Потребителското име вече е заето.")
-        
-    fn_exists = await db.execute(select(Student).where(Student.faculty_number == payload.faculty_number))
-    if fn_exists.scalar_one_or_none():
+    if (await db.execute(select(Student).where(Student.faculty_number == payload.faculty_number))).scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Студент с този факултетен номер вече съществува.")
 
     try:
-        # 2. Търсим групата по новия композитен ключ (Име + Курс + Специалност)
         group_res = await db.execute(
-            select(Group).where(
-                and_(
-                    Group.name == payload.group_name,
-                    Group.year == payload.group_year,
-                    Group.major == payload.group_major
-                )
-            )
+            select(Group).where(and_(
+                Group.name  == payload.group_name,
+                Group.year  == payload.group_year,
+                Group.major == payload.group_major,
+            ))
         )
         group = group_res.scalar_one_or_none()
-        
-        # АКО ТАЗИ СПЕЦИФИЧНА ГРУПА НЕ СЪЩЕСТВУВА, Я СЪЗДАВАМЕ АВТОМАТИЧНО
         if not group:
-            group = Group(
-                name=payload.group_name,
-                year=payload.group_year,
-                major=payload.group_major
-            )
+            group = Group(name=payload.group_name, year=payload.group_year, major=payload.group_major)
             db.add(group)
-            await db.flush() # Вземаме генерираното group.id в паметта
+            await db.flush()
 
-        # 3. Създаваме студента с правилното групово ID
         new_student = Student(
-            faculty_number=payload.faculty_number,
-            rfid_uid=payload.rfid_uid,
-            name=payload.name,
-            group_id=group.id  
+            faculty_number = payload.faculty_number,
+            rfid_uid       = payload.rfid_uid,   # може да е None
+            name           = payload.name,
+            group_id       = group.id,
         )
         db.add(new_student)
-        await db.flush() 
+        await db.flush()
 
-        # 4. Създаваме потребителския акаунт за вход
         new_user = User(
-            username=payload.username,
-            password_hash=User.hash_password(payload.password),
-            role="student",
-            linked_student_id=new_student.student_id
+            username          = payload.username,
+            password_hash     = User.hash_password(payload.password),
+            role              = "student",
+            linked_student_id = new_student.student_id,
         )
         db.add(new_user)
-        
-        await db.commit() 
-        return {"detail": f"Студентът {payload.name} е регистриран успешно в група {payload.group_name}, {payload.group_year} курс, специалност {payload.group_major}!"}
-        
+        await db.commit()
+        return {"detail": f"Студентът {payload.name} е регистриран успешно!"}
     except Exception as e:
-        await db.rollback() 
-        raise HTTPException(status_code=500, detail=f"Системна грешка при запис: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Системна грешка: {str(e)}")
+
 
 @router.post("/register/teacher", dependencies=[Depends(require_role("admin"))])
 async def register_teacher(payload: TeacherRegisterIn, db: AsyncSession = Depends(get_async_session)):
-    user_exists = await db.execute(select(User).where(User.username == payload.username))
-    if user_exists.scalar_one_or_none():
+    if (await db.execute(select(User).where(User.username == payload.username))).scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Потребителското име вече е заето.")
-
     try:
-        # Първо създаваме преподавателя
-        new_teacher = Teacher(
-            name=payload.name,
-            department=payload.department,
-            title=payload.title
-        )
+        new_teacher = Teacher(name=payload.name, department=payload.department, title=payload.title)
         db.add(new_teacher)
         await db.flush()
-
-        # Второ създаваме уеб потребителя
         new_user = User(
-            username=payload.username,
-            password_hash=User.hash_password(payload.password),
-            role="teacher",
-            linked_teacher_id=new_teacher.id
+            username          = payload.username,
+            password_hash     = User.hash_password(payload.password),
+            role              = "teacher",
+            linked_teacher_id = new_teacher.id,
         )
         db.add(new_user)
-        
         await db.commit()
         return {"detail": f"Преподавателят {payload.name} е регистриран успешно!"}
-        
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Системна грешка при запис: {str(e)}")
-    
+        raise HTTPException(status_code=500, detail=f"Системна грешка: {str(e)}")
+
+
 @router.post("/register/admin", dependencies=[Depends(require_role("admin"))])
 async def register_admin(payload: AdminRegisterIn, db: AsyncSession = Depends(get_async_session)):
-    user_exists = await db.execute(select(User).where(User.username == payload.username))
-    if user_exists.scalar_one_or_none():
+    if (await db.execute(select(User).where(User.username == payload.username))).scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Потребителското име вече е заето.")
-
     try:
-        new_user = User(
-            username=payload.username,
-            password_hash=User.hash_password(payload.password),
-            role="admin"
-        )
-        db.add(new_user)
+        db.add(User(username=payload.username, password_hash=User.hash_password(payload.password), role="admin"))
         await db.commit()
-        return {"detail": f"Администраторът {payload.username} е създаден успешно!"}
+        return {"detail": f"Администраторът {payload.username} е създаден."}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Системна грешка при запис: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Системна грешка: {str(e)}")
+
+
+# ──────────────────────────────────────────────
+# UPDATE ENDPOINTS
+# ──────────────────────────────────────────────
 
 @router.patch("/students/{student_id}", dependencies=[Depends(require_role("admin"))])
 async def update_student(student_id: int, payload: StudentUpdate, db: AsyncSession = Depends(get_async_session)):
@@ -232,70 +243,59 @@ async def update_student(student_id: int, payload: StudentUpdate, db: AsyncSessi
         raise HTTPException(status_code=404, detail="Студентът не е намерен.")
 
     if payload.faculty_number and payload.faculty_number != student.faculty_number:
-        res = await db.execute(select(Student).where(Student.faculty_number == payload.faculty_number))
-        if res.scalar_one_or_none():
-            raise HTTPException(status_code=400, detail="Този факултетен номер вече съществува.")
+        if (await db.execute(select(Student).where(Student.faculty_number == payload.faculty_number))).scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Факултетният номер вече съществува.")
         student.faculty_number = payload.faculty_number
 
     if payload.rfid_uid and payload.rfid_uid != student.rfid_uid:
-        res = await db.execute(select(Student).where(Student.rfid_uid == payload.rfid_uid))
-        if res.scalar_one_or_none():
-            raise HTTPException(status_code=400, detail="Този RFID вече се използва от друг студент.")
+        if (await db.execute(select(Student).where(Student.rfid_uid == payload.rfid_uid))).scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Този RFID вече се използва.")
         student.rfid_uid = payload.rfid_uid
 
     if payload.name:
         student.name = payload.name
 
-    # Смяна на група
     if any([payload.group_name, payload.group_year, payload.group_major]):
-        curr_group = await db.get(Group, student.group_id)
-        
-        new_g_name = payload.group_name if payload.group_name else curr_group.name
-        new_g_year = payload.group_year if payload.group_year else curr_group.year
-        new_g_major = payload.group_major.upper() if payload.group_major else curr_group.major
-        
-        res_group = await db.execute(select(Group).where(and_(
-            Group.name == new_g_name, Group.year == new_g_year, Group.major == new_g_major
-        )))
-        target_group = res_group.scalar_one_or_none()
-        
-        if not target_group:
-            target_group = Group(name=new_g_name, year=new_g_year, major=new_g_major)
-            db.add(target_group)
+        curr = await db.get(Group, student.group_id)
+        gn = payload.group_name  or curr.name
+        gy = payload.group_year  or curr.year
+        gm = (payload.group_major.upper() if payload.group_major else curr.major)
+        res = await db.execute(select(Group).where(and_(Group.name == gn, Group.year == gy, Group.major == gm)))
+        tg = res.scalar_one_or_none()
+        if not tg:
+            tg = Group(name=gn, year=gy, major=gm)
+            db.add(tg)
             await db.flush()
-            
-        student.group_id = target_group.id
+        student.group_id = tg.id
 
     await db.commit()
     return {"detail": "Данните на студента са обновени."}
+
 
 @router.patch("/teachers/{teacher_id}", dependencies=[Depends(require_role("admin"))])
 async def update_teacher(teacher_id: int, payload: TeacherUpdate, db: AsyncSession = Depends(get_async_session)):
     teacher = await db.get(Teacher, teacher_id)
     if not teacher:
         raise HTTPException(status_code=404, detail="Преподавателят не е намерен.")
-
-    if payload.name:
-        teacher.name = payload.name
-    if payload.title is not None: 
-        teacher.title = payload.title
-    if payload.department is not None:
-        teacher.department = payload.department
-
+    if payload.name:        teacher.name       = payload.name
+    if payload.title is not None:  teacher.title  = payload.title
+    if payload.department is not None: teacher.department = payload.department
     await db.commit()
     return {"detail": "Данните на преподавателя са обновени."}
 
-@router.get("/groups", response_model=List[GroupOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
+
+# ──────────────────────────────────────────────
+# GET ENDPOINTS
+# ──────────────────────────────────────────────
+
+@router.get("/groups",   response_model=List[GroupOut],   dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_groups(db: AsyncSession = Depends(get_async_session)):
-    res = await db.execute(select(Group))
-    return res.scalars().all()
+    return (await db.execute(select(Group))).scalars().all()
 
 @router.get("/students", response_model=List[StudentOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_students(db: AsyncSession = Depends(get_async_session)):
-    res = await db.execute(select(Student))
-    return res.scalars().all()
+    return (await db.execute(select(Student))).scalars().all()
 
 @router.get("/teachers", response_model=List[TeacherOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_teachers(db: AsyncSession = Depends(get_async_session)):
-    res = await db.execute(select(Teacher))
-    return res.scalars().all()
+    return (await db.execute(select(Teacher))).scalars().all()

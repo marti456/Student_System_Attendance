@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Регистрира нашия HCE сервис за AID: F0 01 02 03 04 05 06
+    Трябва да съвпада ТОЧНО с AID-а в ESP32 кода!
+    Категория "other" означава, че не се конкурира с payment apps.
+-->
+<host-apdu-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/app_name"
+    android:requireDeviceUnlock="false">
+
+    <aid-group
+        android:description="@string/app_name"
+        android:category="other">
+
+        <!-- New Unique AID: A0 00 00 02 47 10 01 -->
+        <aid-filter android:name="A0000002471001"/>
+
+    </aid-group>
+
+</host-apdu-service>
