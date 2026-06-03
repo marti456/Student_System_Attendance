@@ -299,8 +299,27 @@ void loop() {
 
     if (payload.length() > 0) {
         Serial.println("Успешно декодиран пакет: " + payload);
-        sendToServer(payload); // Изпращаме към FastAPI
-        delay(3000);           // Голяма пауза след успех, за да предотвратим двойно чекиране
+        
+        // ── НАЧАЛО НА ТВОЯ ACK КОД ──────────────────────────────────────────────
+        Serial.println("Sending confirmation to phone...");
+        uint8_t ackCommand[] = {0x00, 0x40, 0x00, 0x00}; 
+        uint8_t ackResponse[16]; // По-добре малко по-голям буфер за всеки случай
+        uint8_t ackResponseLen = sizeof(ackResponse);
+        
+        // Изпращаме ACK командата докато телефонът все още е на антената
+        bool ackSuccess = nfc.inDataExchange(ackCommand, sizeof(ackCommand), ackResponse, &ackResponseLen);
+        
+        if (ackSuccess) {
+            Serial.println("Phone acknowledged receipt!");
+        } else {
+            Serial.println("Failed to send confirmation to phone (but payload is captured).");
+            // Не спираме процеса тук, защото вече имаме данните!
+        }
+        // ── КРАЙ НА ACK КОДА ───────────────────────────────────────────────────
+
+        // Сега пращаме към FastAPI (това отнема време)
+        sendToServer(payload); 
+        delay(3000); // Голяма пауза след успех
     } else {
         Serial.println("Грешка при парсване на данните (невалиден формат).");
         signalError(); //
