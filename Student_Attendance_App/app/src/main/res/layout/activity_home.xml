@@ -8,12 +8,13 @@
     android:gravity="center">
 
     <!-- Анимирана NFC иконка -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="📱"
-        android:textSize="80sp"
-        android:layout_marginBottom="24dp"/>
+    <ImageView
+        android:id="@+id/ivStatusGif"
+        android:layout_width="180dp"
+        android:layout_height="180dp"
+        android:layout_marginBottom="24dp"
+        android:scaleType="fitCenter"
+        android:background="?android:attr/windowBackground" />
 
     <!-- Факултетен номер -->
     <TextView
@@ -22,7 +23,7 @@
         android:layout_height="wrap_content"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="#212121"
+        android:textColor="?android:attr/textColorPrimary"
         android:layout_marginBottom="16dp"/>
 
     <!-- NFC статус -->
@@ -34,12 +35,28 @@
         android:gravity="center"
         android:lineSpacingExtra="4dp"
         android:layout_marginBottom="32dp"/>
+    <Button
+        android:id="@+id/btnCheckin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Чекирай се"
+        android:textSize="18sp"
+        android:padding="16dp"
+        android:layout_marginTop="24dp"/>
 
+    <TextView
+        android:id="@+id/tvCountdown"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:textStyle="bold"
+        android:layout_marginTop="8dp"/>
     <!-- Разделителна линия -->
     <View
         android:layout_width="200dp"
         android:layout_height="1dp"
-        android:background="#E0E0E0"
+        android:background="?android:attr/listDivider"
         android:layout_marginBottom="16dp"/>
 
     <!-- ATC брояч -->
@@ -48,7 +65,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="13sp"
-        android:textColor="#9E9E9E"
+        android:textColor="?android:attr/textColorSecondary"
         android:layout_marginBottom="40dp"/>
 
     <!-- Бутон за изход -->
@@ -57,7 +74,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Изход"
-        android:backgroundTint="#F44336"
+        android:backgroundTint="@color/error_red"
         android:textColor="@android:color/white"
         android:paddingHorizontal="32dp"/>
 

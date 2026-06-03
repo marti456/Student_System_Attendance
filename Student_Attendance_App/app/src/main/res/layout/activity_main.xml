@@ -8,12 +8,12 @@
     android:padding="32dp"
     android:gravity="center">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="📚"
-        android:textSize="56sp"
-        android:layout_marginBottom="8dp"/>
+    <ImageView
+        android:layout_width="139dp"
+        android:layout_height="157dp"
+        android:layout_marginBottom="8dp"
+        android:src="@drawable/tu_sofia_logo"
+        android:textSize="56sp" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -26,9 +26,9 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Вход в системата"
+        android:text="Вход"
         android:textSize="14sp"
-        android:textColor="#888888"
+        android:textColor="?android:attr/textColorSecondary"
         android:layout_marginBottom="40dp"/>
 
     <com.google.android.material.textfield.TextInputLayout

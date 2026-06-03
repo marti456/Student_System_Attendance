@@ -1,0 +1,8 @@
+// config.h.example
+// Копирай този файл като config.h и попълни данните си.
+#pragma once
+
+#define WIFI_SSID     "твоята_мрежа"
+#define WIFI_PASS     "твоята_парола"
+#define SERVER_URL    "http://IP_НА_СЪРВЪРА:8000/checkin"
+#define ROOM_NUMBER   "101"

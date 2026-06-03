@@ -67,12 +67,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-
-// ── Конфигурация ──────────────────────────────────────────────────────────────
-static const char* WIFI_SSID   = "MERCUSYS_2C70";
-static const char* WIFI_PASS   = "kolelo7141";
-static const char* SERVER_URL  = "http://192.168.1.150:8000/checkin";
-static const char* ROOM_NUMBER = "101";
+#include "config.h"
 
 // ── Пинове ───────────────────────────────────────────────────────────────────
 #define PIN_PN532_SCK   14

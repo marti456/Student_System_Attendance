@@ -2,4 +2,16 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- TU Sofia Colors -->
+    <color name="tu_blue">#0046AD</color>
+    <color name="tu_blue_dark">#002E73</color>
+    <color name="tu_blue_light">#4F83FF</color>
+
+    <!-- Semantic Colors for Dark/Light balance -->
+    <color name="background_light">#FFFFFF</color>
+    <color name="background_dark">#121212</color>
+    <color name="surface_dark">#1E1E1E</color>
+
+    <color name="error_red">#D32F2F</color>
 </resources>

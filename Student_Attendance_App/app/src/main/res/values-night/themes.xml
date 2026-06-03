@@ -1,7 +1,13 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.Student_Attendance_App" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/tu_blue_light</item>
+        <item name="colorSecondary">@color/tu_blue</item>
+
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">@color/background_dark</item>
+        <!-- Background/Surface -->
+        <item name="android:windowBackground">@color/background_dark</item>
     </style>
 </resources>
