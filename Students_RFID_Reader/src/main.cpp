@@ -191,40 +191,6 @@ String parsePayload(uint8_t* response, uint8_t responseLen) {
     Serial.println("Успешно декодиран динамичен пакет: " + finalPayload);
     return finalPayload;
 }
-// String parsePayload(uint8_t* response, uint8_t responseLen) {
-//     String textHeader = "";
-//     int hmacStartOffset = -1;
-//     int pipeCount = 0;
-
-//     // 1. Извличаме текстовата част ("ФН|ATC|") до втория разделител '|'
-//     for (int i = 0; i < (int)responseLen; i++) {
-//         char c = (char)response[i];
-//         textHeader += c;
-//         if (c == '|') {
-//             pipeCount++;
-//             if (pipeCount == 2) {
-//                 hmacStartOffset = i + 1; // Суровите байтове на HMAC започват веднага тук
-//                 break;
-//             }
-//         }
-//     }
-
-//     // Валидация: Ако липсват двата пайпа, пакетът е тотално дефектен
-//     if (hmacStartOffset == -1 || hmacStartOffset + 32 > responseLen) {
-//         return "";
-//     }
-
-//     // 2. Взимаме следващите точно 32 байта и ги превръщаме в Hex текст за FastAPI
-//     String hmacHex = "";
-//     for (int i = 0; i < 32; i++) {
-//         char buf[3];
-//         sprintf(buf, "%02x", response[hmacStartOffset + i]);
-//         hmacHex += buf;
-//     }
-
-//     // Връщаме чистия, сглобен стринг, готов за FastAPI
-//     return textHeader + hmacHex;
-// }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
@@ -299,25 +265,18 @@ void loop() {
 
     if (payload.length() > 0) {
         Serial.println("Успешно декодиран пакет: " + payload);
-        
-        // ── НАЧАЛО НА ТВОЯ ACK КОД ──────────────────────────────────────────────
         Serial.println("Sending confirmation to phone...");
         uint8_t ackCommand[] = {0x00, 0x40, 0x00, 0x00}; 
-        uint8_t ackResponse[16]; // По-добре малко по-голям буфер за всеки случай
+        uint8_t ackResponse[16]; // по-голям буфер за всеки случай
         uint8_t ackResponseLen = sizeof(ackResponse);
         
-        // Изпращаме ACK командата докато телефонът все още е на антената
         bool ackSuccess = nfc.inDataExchange(ackCommand, sizeof(ackCommand), ackResponse, &ackResponseLen);
         
         if (ackSuccess) {
             Serial.println("Phone acknowledged receipt!");
         } else {
             Serial.println("Failed to send confirmation to phone (but payload is captured).");
-            // Не спираме процеса тук, защото вече имаме данните!
         }
-        // ── КРАЙ НА ACK КОДА ───────────────────────────────────────────────────
-
-        // Сега пращаме към FastAPI (това отнема време)
         sendToServer(payload); 
         delay(3000); // Голяма пауза след успех
     } else {
