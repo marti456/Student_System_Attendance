@@ -69,7 +69,6 @@
 #include <ArduinoJson.h>
 #include "config.h"
 
-// ── Пинове ───────────────────────────────────────────────────────────────────
 #define PIN_PN532_SCK   14
 #define PIN_PN532_MOSI  13
 #define PIN_PN532_MISO  26
@@ -79,10 +78,6 @@
 #define PIN_BUZZER      33
 #define BUZZER_CHANNEL  0
 
-// ── SELECT AID APDU ──────────────────────────────────────────────────────────
-// Казваме на телефона: "Искаме да говорим с нашето HCE приложение."
-// AID-ът трябва да съвпада точно с apduservice.xml.
-//
 // Структура (ISO 7816-4):
 //   CLA  INS  P1   P2   Lc   [AID - 7 байта]                    Le
 //   0x00 0xA4 0x04 0x00 0x07 0xA0 0x00 0x00 0x02 0x47 0x10 0x01 0x00
