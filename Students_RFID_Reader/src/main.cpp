@@ -148,29 +148,24 @@ String parsePayload(uint8_t* response, uint8_t responseLen) {
         Serial.println("Грешка: Пакетът е твърде къс.");
         return "";
     }
-
     // 1. Четем първия байт, за да разберем дължината на факултетния номер
     uint8_t fnLength = response[0];
-    
     // Защитна проверка за препълване на буфера
     if (1 + fnLength + 4 + 32 > responseLen) {
         Serial.println("Грешка: Несъответствие в дължината на пакета.");
         return "";
     }
-
     // 2. Извличаме факултетния номер като текст (запазваме водещите нули!)
     String facultyNumber = "";
     for (int i = 0; i < fnLength; i++) {
         facultyNumber += (char)response[1 + i];
     }
-
     // 3. Намираме къде започва ATC (веднага след ФН)
     int atcOffset = 1 + fnLength;
     uint32_t atc = (response[atcOffset] << 24) | 
                    (response[atcOffset + 1] << 16) | 
                    (response[atcOffset + 2] << 8) | 
                    response[atcOffset + 3];
-
     // 4. Намираме къде започва HMAC (веднага след ATC)
     int hmacOffset = atcOffset + 4;
     String hmacHex = "";
@@ -179,10 +174,8 @@ String parsePayload(uint8_t* response, uint8_t responseLen) {
         sprintf(buf, "%02x", response[hmacOffset + i]);
         hmacHex += buf;
     }
-
     // 5. Сглобяваме финалния стринг за FastAPI
     String finalPayload = facultyNumber + "|" + String(atc) + "|" + hmacHex;
-    
     Serial.println("Успешно декодиран динамичен пакет: " + finalPayload);
     return finalPayload;
 }
@@ -190,16 +183,12 @@ String parsePayload(uint8_t* response, uint8_t responseLen) {
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
-
     pinMode(PIN_LED_GREEN, OUTPUT);
     pinMode(PIN_LED_RED,   OUTPUT);
     ledcSetup(BUZZER_CHANNEL, 1000, 8);
     ledcAttachPin(PIN_BUZZER, BUZZER_CHANNEL);
     digitalWrite(PIN_LED_GREEN, LOW);
     digitalWrite(PIN_LED_RED,   LOW);
-
-    // SPI.begin() НЕ се извиква — Adafruit_PN532 в software SPI режим
-    // го инициализира сам чрез конструктора с 4 аргумента.
 
     nfc.begin();
     if (!nfc.getFirmwareVersion()) {
@@ -229,33 +218,23 @@ void setup() {
 
 // ── Loop ──────────────────────────────────────────────────────────────────────
 void loop() {
-    //Serial.println("Waiting for phone...");
-
-    // Активираме ISO-DEP (ISO 14443-4) протокола
     if (!nfc.inListPassiveTarget()) {
         delay(100); // Кратка пауза, за да не претоварваме процесора
         return;
     }
-
     Serial.println("Phone detected!");
-
-    uint8_t response[64]; // Понеже пакетът е къс (~45 байта), 64 байта буфер ни е напълно достатъчен
+    uint8_t response[64];
     uint8_t responseLen = sizeof(response);
-
-    // Правим САМО ЕДИН чист и директен опит за обмен на данни
     bool success = nfc.inDataExchange(
         (uint8_t*)SELECT_AID_APDU, sizeof(SELECT_AID_APDU),
         response, &responseLen
     );
-
     if (!success) {
         Serial.println("NFC Транзакцията се провали хардуерно.");
         signalError(); // Директна сигнализация за грешка
         delay(1000);   // Пауза, за да може студентът да си дръпне телефона
         return;
     }
-
-    // Опит за парсване на прочетените данни
     String payload = parsePayload(response, responseLen);
 
     if (payload.length() > 0) {
@@ -276,7 +255,7 @@ void loop() {
         delay(3000); // Голяма пауза след успех
     } else {
         Serial.println("Грешка при парсване на данните (невалиден формат).");
-        signalError(); //
-        delay(1000);   //
+        signalError();
+        delay(1000);  
     }
 }
