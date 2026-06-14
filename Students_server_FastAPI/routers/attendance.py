@@ -161,11 +161,6 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
     return {"detail": f"Успешно: {status_text}", "status": status_text}
 
 
-# ──────────────────────────────────────────────────────────────
-# Останалите endpoints (ръчно отчитане, списък, редакция, изтриване)
-# са непроменени спрямо оригинала.
-# ──────────────────────────────────────────────────────────────
-
 @router.get("/attendance", response_model=PaginatedAttendanceOut)
 async def list_attendance(
     skip: int = 0,
