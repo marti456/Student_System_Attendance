@@ -744,7 +744,7 @@ function toast(msg, type = 'info') {
   el.className = `toast ${type}`; el.textContent = msg;
   document.getElementById('toast-container').appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
-  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 320); }, 3500);
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 320); }, 5000);
 }
 
 // ================================================================
