@@ -57,14 +57,13 @@ class MainActivity : AppCompatActivity() {
                     val tokenResp = RetrofitClient.api.login(username, password)
                     prefs.token = tokenResp.access_token
 
-                    // Стъпка 2: Провизиониране на HMAC ключ
+                    // Стъпка 2: Даване на HMAC ключ
                     val keyResp = RetrofitClient.api.provisionKey("Bearer ${tokenResp.access_token}")
 
                     // Записваме всичко криптирано в Keystore
                     prefs.hmacKey       = keyResp.hmac_key
                     prefs.facultyNumber = keyResp.faculty_number
-                    // Взимаме ATC-а от сървъра — така се синхронизираме при
-                    // преинсталация или смяна на телефон
+                    // Взимаме ATC-а от сървъра за синхронизирация при преинсталация или смяна на телефон
                     prefs.atcCounter    = keyResp.atc
                     getSharedPreferences("nfc_fast_prefs", Context.MODE_PRIVATE)
                         .edit()

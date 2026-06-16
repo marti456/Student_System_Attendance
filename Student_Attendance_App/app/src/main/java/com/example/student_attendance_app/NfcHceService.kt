@@ -40,6 +40,10 @@ class NfcHceService : HostApduService() {
         @Volatile
         var tapCallback: (() -> Unit)? = null
 
+        /** Callback за уведомяване на HomeActivity при прекъсната връзка/грешка */
+        @Volatile
+        var failureCallback: (() -> Unit)? = null
+
         /**
          * Управлява дали телефонът да отговаря на NFC четеца.
          * HomeActivity го включва за 30 секунди при натискане на бутон.
@@ -56,22 +60,33 @@ class NfcHceService : HostApduService() {
     }
 
     override fun processCommandApdu(apdu: ByteArray, extras: Bundle?): ByteArray {
-        Log.d(TAG, "NFC ДОКОСВАНЕ! Получен APDU: ${apdu.toHexString()}")
+        val apduHex = apdu.toHexString()
+        Log.d(TAG, "NFC ДОКОСВАНЕ! Получен APDU: $apduHex")
 
         // Ако не сме в режим "Чекиране", игнорираме докосването.
-        // Това предотвратява случайно чекиране, докато телефонът е в джоба или другаде.
         if (!isCheckinActive) {
-            Log.w(TAG, "❌ Опит за докосване, но режимът е изключен. Игнорираме.")
+            Log.w(TAG, "Опит за докосване, но режимът е изключен. Игнорираме.")
             return SW_NOT_FOUND
         }
 
         return when {
+            // Стъпка 1: Машината иска данни
             isOurSelectAid(apdu) -> {
-                Log.i(TAG, "✅ НАШИЯТ AID Е РАЗПОЗНАТ!")
+                Log.i(TAG, "SELECT AID: Изпращаме данни...")
                 handleSelectAid()
             }
+            // Стъпка 2: Машината потвърждава (ACK), че е получила данните успешно
+            apdu.size >= 2 && apdu[1] == 0x40.toByte() -> {
+                Log.i(TAG, "ACK ПОЛУЧЕН: Машината потвърди успешно четене!")
+                
+                // Едва сега деактивираме режима и казваме на UI да покаже успех
+                isCheckinActive = false
+                tapCallback?.invoke()
+                
+                SW_OK
+            }
             else -> {
-                Log.w(TAG, "❓ Непозната команда: ${apdu.toHexString()}")
+                Log.w(TAG, "Непозната команда: $apduHex")
                 SW_UNKNOWN
             }
         }
@@ -103,9 +118,7 @@ class NfcHceService : HostApduService() {
 
         Log.d(TAG, "Payload изпратен: $facultyNumber|$atc (${buffer.capacity()} байта)")
 
-        // 4. След успешен отговор, деактивираме режима автоматично
-        isCheckinActive = false
-        tapCallback?.invoke()
+        // Вече НЕ извикваме tapCallback тук! Чакаме ACK командата (0x40).
 
         return buffer.array() + SW_OK
     }
@@ -126,6 +139,13 @@ class NfcHceService : HostApduService() {
 
     override fun onDeactivated(reason: Int) {
         Log.d(TAG, "HCE деактивиран: $reason")
+        
+        // Ако връзката прекъсне (reason 0 - LINK_LOSS), докато все още чакаме ACK
+        if (isCheckinActive && reason == DEACTIVATION_LINK_LOSS) {
+            Log.w(TAG, "⚠️ Връзката бе прекъсната преди потвърждението (ACK).")
+            isCheckinActive = false
+            failureCallback?.invoke()
+        }
     }
 
     private fun ByteArray.toHexString() = joinToString(" ") { "%02X".format(it) }

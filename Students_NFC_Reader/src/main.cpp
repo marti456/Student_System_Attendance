@@ -222,7 +222,7 @@ void loop() {
         delay(100); // Кратка пауза, за да не претоварваме процесора
         return;
     }
-    Serial.println("Phone detected!");
+    Serial.println("Засечен е телефон");
     uint8_t response[64];
     uint8_t responseLen = sizeof(response);
     bool success = nfc.inDataExchange(
@@ -239,7 +239,6 @@ void loop() {
 
     if (payload.length() > 0) {
         Serial.println("Успешно декодиран пакет: " + payload);
-        Serial.println("Sending confirmation to phone...");
         uint8_t ackCommand[] = {0x00, 0x40, 0x00, 0x00}; 
         uint8_t ackResponse[16]; // по-голям буфер за всеки случай
         uint8_t ackResponseLen = sizeof(ackResponse);
@@ -247,9 +246,9 @@ void loop() {
         bool ackSuccess = nfc.inDataExchange(ackCommand, sizeof(ackCommand), ackResponse, &ackResponseLen);
         
         if (ackSuccess) {
-            Serial.println("Phone acknowledged receipt!");
+            Serial.println("Телефонът потвърди получаването на данните (ACK).");
         } else {
-            Serial.println("Failed to send confirmation to phone (but payload is captured).");
+            Serial.println("Потвърждението към телефона се провали.");
         }
         sendToServer(payload); 
         delay(3000); // Голяма пауза след успех

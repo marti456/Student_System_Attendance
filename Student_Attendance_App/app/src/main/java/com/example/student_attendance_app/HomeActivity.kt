@@ -94,7 +94,10 @@ class HomeActivity : AppCompatActivity() {
             }
 
             override fun onFinish() {
-                resetCheckinUI()
+                // Ако таймерът изтече без успех → показваме грешка
+                if (NfcHceService.isCheckinActive) {
+                    showUnsuccessfulCheckin()
+                }
             }
         }.start()
     }
@@ -104,6 +107,18 @@ class HomeActivity : AppCompatActivity() {
         btnCheckin.isEnabled = true
         tvCountdown.visibility = View.GONE
         checkNfcStatus(tvNfcStatus)
+    }
+
+    private fun showUnsuccessfulCheckin() {
+        runOnUiThread {
+            loadGif(R.drawable.unsuccessfull_checking)
+            tvNfcStatus.text = "❌ Чекирането не бе успешно.\nОпитайте отново."
+            tvNfcStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+            
+            ivStatusGif.postDelayed({
+                resetCheckinUI()
+            }, 3000)
+        }
     }
 
     override fun onResume() {
@@ -127,6 +142,10 @@ class HomeActivity : AppCompatActivity() {
             }
         }
 
+        NfcHceService.failureCallback = {
+            showUnsuccessfulCheckin()
+        }
+
         nfcAdapter?.let { adapter ->
             val hceService = ComponentName(this, NfcHceService::class.java)
             val cardEmulation = CardEmulation.getInstance(adapter)
@@ -140,6 +159,7 @@ class HomeActivity : AppCompatActivity() {
         countDownTimer?.cancel()
         NfcHceService.isCheckinActive = false
         NfcHceService.tapCallback = null
+        NfcHceService.failureCallback = null
 
         nfcAdapter?.let { adapter ->
             CardEmulation.getInstance(adapter).unsetPreferredService(this)
