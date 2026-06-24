@@ -25,25 +25,25 @@ app.include_router(administration.router, prefix="/admin", tags=["admin"])
 # ── Статични файлове: CSS, JS, лого ──────────────────────────
 # Монтира се на /static, но файловете са в текущата директория.
 # html=True позволява директен достъп по filename.
-app.mount("/static", StaticFiles(directory=".", html=False), name="static")
+app.mount("/static", StaticFiles(directory="static", html=False), name="static")
 
 # ── Фронтенд: всички останали заявки → index.html ────────────
 @app.get("/", include_in_schema=False)
 async def serve_frontend():
-    return FileResponse("index.html")
+    return FileResponse("static/index.html")
 
 # Поддръжка на директен достъп до CSS/JS/лого от корена
 @app.get("/styles.css", include_in_schema=False)
 async def serve_css():
-    return FileResponse("styles.css", media_type="text/css")
+    return FileResponse("static/styles.css", media_type="text/css")
 
 @app.get("/app.js", include_in_schema=False)
 async def serve_js():
-    return FileResponse("app.js", media_type="application/javascript")
+    return FileResponse("static/app.js", media_type="application/javascript")
 
 @app.get("/TU-Sofia_logo.png", include_in_schema=False)
 async def serve_logo():
-    return FileResponse("TU-Sofia_logo.png", media_type="image/png")
+    return FileResponse("static/TU-Sofia_logo.png", media_type="image/png")
 
 # ── Стартиране на БД ─────────────────────────────────────────
 @app.on_event("startup")

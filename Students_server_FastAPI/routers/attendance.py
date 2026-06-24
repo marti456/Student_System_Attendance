@@ -189,6 +189,9 @@ async def list_attendance(
     if current_user.role == "student":
         stmt = stmt.where(Attendance.student_id == current_user.linked_student_id)
 
+    if current_user.role == "teacher":
+        stmt = stmt.where(GroupCourse.teacher_id == current_user.linked_teacher_id)
+
     if search:
         term = f"%{search}%"
         stmt = stmt.where(
@@ -238,6 +241,11 @@ async def add_attendance(
         if sched.group_course.teacher_id != current_user.linked_teacher_id:
             raise HTTPException(status_code=403, detail="Нямате права за този предмет.")
 
+    student = await db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+    if student.group_id != sched.group_course.group_id:
+        raise HTTPException(status_code=400, detail="Студентът не е от групата на това занятие.")
     try:
         target_date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:
@@ -248,17 +256,20 @@ async def add_attendance(
     day_end   = datetime.datetime.combine(target_date, datetime.time.max)
 
     existing = await db.execute(
-        select(Attendance).where(
+        select(Attendance)
+        .join(Schedule,    Attendance.schedule_id == Schedule.id)
+        .join(GroupCourse, Schedule.group_course_id == GroupCourse.id)
+        .where(
             and_(
-                Attendance.student_id  == student_id,
-                Attendance.schedule_id == schedule_id,
-                Attendance.timestamp   >= day_start,
-                Attendance.timestamp   <= day_end,
+                Attendance.student_id      == student_id,
+                GroupCourse.course_id      == sched.group_course.course_id,
+                GroupCourse.type           == sched.group_course.type,
+                func.date(Attendance.timestamp) == target_date,
             )
         )
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail=f"Студентът вече има присъствие на {date}.")
+    if existing.scalars().first():
+        raise HTTPException(status_code=400, detail=f"Студентът вече има присъствие за този предмет на {date}.")
 
     att = Attendance(
         student_id  = student_id,
@@ -290,11 +301,19 @@ async def update_attendance(
         raise HTTPException(status_code=404, detail="Записът не е намерен.")
 
     if current_user.role == "teacher":
-        if att.recorded_by not in ("Автоматичен", current_user.username):
+        res_sched = await db.execute(
+            select(Schedule).options(joinedload(Schedule.group_course)).where(Schedule.id == att.schedule_id)
+        )
+        sched = res_sched.scalar_one_or_none()
+        if not sched or sched.group_course.teacher_id != current_user.linked_teacher_id:
             raise HTTPException(status_code=403, detail="Нямате права да редактирате този запис.")
-
+        if att.recorded_by == "Автоматичен":
+            raise HTTPException(status_code=403, detail="Не може да редактирате автоматично записани присъствия.")
+        if att.recorded_by != current_user.username:
+            raise HTTPException(status_code=403, detail="Нямате права да редактирате този запис.")
     if payload.status:
         att.status = payload.status
+        att.recorded_by = current_user.username
 
     await db.commit()
     return {"detail": "Статусът е променен."}
@@ -318,7 +337,9 @@ async def delete_attendance(
         sched = res_sched.scalar_one_or_none()
         if not sched or sched.group_course.teacher_id != current_user.linked_teacher_id:
             raise HTTPException(status_code=403, detail="Нямате права да изтриете този запис.")
-        if att.recorded_by not in ("Автоматичен", current_user.username):
+        if att.recorded_by == "Автоматичен":
+            raise HTTPException(status_code=403, detail="Не може да изтриете автоматично записани присъствия.")
+        if att.recorded_by != current_user.username:
             raise HTTPException(status_code=403, detail="Нямате права да изтривате записи на администратор.")
 
     await db.delete(att)
