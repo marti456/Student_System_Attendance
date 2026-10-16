@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from typing import List
-from models import Course, GroupCourse, Schedule, Teacher, Group, User
+from models import Course, GroupCourse, Schedule, Teacher, Group, User, Student, Attendance
 from schemas import CourseCreate, CourseOut, CourseUpdate, GroupCourseCreate, GroupCourseOut, GroupCourseUpdate, GroupUpdate, ScheduleCreate, ScheduleOut, ScheduleUpdate
 from auth import get_async_session, get_current_user, require_any_role, require_role
 from sqlalchemy.orm import joinedload
@@ -264,3 +264,75 @@ async def get_schedules(db: AsyncSession = Depends(get_async_session), current_u
         stmt = stmt.join(GroupCourse).where(GroupCourse.teacher_id == current_user.linked_teacher_id)
     res = await db.execute(stmt)
     return res.scalars().all()
+
+@router.delete("/groups/{group_id}", dependencies=[Depends(require_role("admin"))])
+async def delete_group(group_id: int, db: AsyncSession = Depends(get_async_session)):
+    group = await db.get(Group, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Групата не е намерена.")
+
+    res_stu = await db.execute(select(Student).where(Student.group_id == group_id))
+    if res_stu.scalars().first():
+        raise HTTPException(status_code=400, detail="В групата има записани студенти. Преместете ги първо.")
+
+    res_gc = await db.execute(select(GroupCourse).where(GroupCourse.group_id == group_id))
+    if res_gc.scalars().first():
+        raise HTTPException(status_code=400, detail="Групата има зачислени дисциплини. Премахнете ги първо.")
+
+    await db.delete(group)
+    await db.commit()
+    return {"detail": f"Групата {group.name} е изтрита успешно."}
+
+
+@router.delete("/courses/{course_id}", dependencies=[Depends(require_role("admin"))])
+async def delete_course(course_id: int, db: AsyncSession = Depends(get_async_session)):
+    course = await db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Предметът не е намерен.")
+
+    res = await db.execute(select(GroupCourse).where(GroupCourse.course_id == course_id))
+    if res.scalars().first():
+        raise HTTPException(
+            status_code=400,
+            detail="Дисциплината е част от учебния план на групи. Премахнете зачисленията към нея първо."
+        )
+
+    await db.delete(course)
+    await db.commit()
+    return {"detail": f"Дисциплината '{course.name}' е изтрита успешно."}
+
+
+@router.delete("/group-courses/{gc_id}", dependencies=[Depends(require_role("admin"))])
+async def delete_group_course(gc_id: int, db: AsyncSession = Depends(get_async_session)):
+    gc = await db.get(GroupCourse, gc_id)
+    if not gc:
+        raise HTTPException(status_code=404, detail="Връзката в учебния план не е намерена.")
+
+    res = await db.execute(select(Schedule).where(Schedule.group_course_id == gc_id))
+    if res.scalars().first():
+        raise HTTPException(
+            status_code=400,
+            detail="Има записи в разписанието за това зачисляване. Изтрийте ги първо."
+        )
+
+    await db.delete(gc)
+    await db.commit()
+    return {"detail": "Зачисляването е изтрито успешно."}
+
+
+@router.delete("/schedules/{schedule_id}", dependencies=[Depends(require_role("admin"))])
+async def delete_schedule(schedule_id: int, db: AsyncSession = Depends(get_async_session)):
+    sched = await db.get(Schedule, schedule_id)
+    if not sched:
+        raise HTTPException(status_code=404, detail="Записът в графика не е намерен.")
+
+    res = await db.execute(select(Attendance).where(Attendance.schedule_id == schedule_id))
+    if res.scalars().first():
+        raise HTTPException(
+            status_code=400,
+            detail="Има записани присъствия за това занятие. Изтрийте ги първо от регистъра."
+        )
+
+    await db.delete(sched)
+    await db.commit()
+    return {"detail": "Занятието е изтрито успешно от графика."}

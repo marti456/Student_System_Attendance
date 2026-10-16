@@ -113,8 +113,16 @@ async def checkin(payload: CheckinIn, db: AsyncSession = Depends(get_async_sessi
         else:
             guest_schedule = sched
 
-    if guest_schedule and not matched_schedule:
-        matched_schedule = guest_schedule  # Отработване в чужда група
+    if guest_schedule and not matched_schedule: # Отработване в чужда група
+        own_match = await db.execute(
+            select(GroupCourse.id).where(
+                GroupCourse.group_id == student.group_id,
+                GroupCourse.course_id == guest_schedule.group_course.course_id,
+                GroupCourse.type == guest_schedule.group_course.type,
+            )
+        )
+        if own_match.scalar_one_or_none():
+            matched_schedule = guest_schedule
 
     if not matched_schedule:
         raise HTTPException(status_code=404, detail="В момента няма активно занятие в тази зала.")

@@ -218,18 +218,21 @@ function typeBadge(t) {
   const cls = { lecture:'badge-navy', exercise:'badge-blue', lab:'badge-amber' }[t] || 'badge-gray';
   return `<span class="badge ${cls}">${typeName(t)}</span>`;
 }
+
 function statusBadge(s) {
   if (s === 'Присъствие') return `<span class="badge badge-green">✓ Присъствие</span>`;
   if (s === 'Отработване') return `<span class="badge badge-amber">↺ Отработване</span>`;
   if (s === 'Извинено')   return `<span class="badge badge-blue">📋 Извинено</span>`;
   return `<span class="badge badge-gray">${s}</span>`;
 }
+
 function scheduleLabel(s) {
   if (!s) return '?';
   const gc = getGC(s.group_course_id);
   if (!gc) return `Разп. #${s.id}`;
   return `${getCourse(gc.course_id).name} [${typeName(gc.type)}] – ${getGroup(gc.group_id).name} – ${DAY_NAMES[s.day_of_week]} ${s.start_time}–${s.end_time} (${s.room_number})`;
 }
+
 function fmtDate(d) { return d ? d.substring(0, 10) : '—'; }
 function fmtDT(dt) {
   if (!dt) return '—';
@@ -299,6 +302,7 @@ function filterStudents() {
   S.filtered.students = S.students.filter(s => s.name.toLowerCase().includes(q) || s.faculty_number.toLowerCase().includes(q));
   S.cpag.students = 1; renderStudents();
 }
+
 function renderStudents() {
   const arr = S.filtered.students, page = slicePage(arr, 'students');
   const tbody = document.getElementById('stu-tbody');
@@ -311,11 +315,12 @@ function renderStudents() {
       <td><strong>${s.name}</strong></td>
       <td style="font-size:12px;color:var(--txt3)">${s.rfid_uid || '—'}</td>
       <td>${g.name}</td><td>${g.year} курс</td><td>${g.major}</td>
-      <td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openStudentModal(${s.student_id})">✏️</button></div></td>
-    </tr>`;
+<td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openStudentModal(${s.student_id})">✏️</button>
+<button class="btn btn-danger btn-sm btn-icon" onclick="deleteStudent(${s.student_id})">🗑️</button></div></td>    </tr>`;
   }).join('');
   buildPag(document.getElementById('stu-pag'), arr, 'students', renderStudents);
 }
+
 function openStudentModal(id) {
   const s = id ? S.students.find(x => x.student_id === id) : null, isEdit = !!s;
   document.getElementById('modal-title').textContent = isEdit ? 'Редактиране на студент' : 'Регистрация на нов студент';
@@ -344,7 +349,7 @@ function openStudentModal(id) {
       <div class="form-group"><label>Пълно Им.</label><input id="sf-name" placeholder="Иван Петров"/></div>
       <div class="form-group"><label>Факулт. №</label><input id="sf-fn" placeholder="221212001"/></div>
       <div class="form-group"><label>RFID UID</label><input id="sf-rfid" placeholder="(незадълж.)"/></div>
-      <div class="form-group"><label>Група</label><input id="sf-gname" placeholder="ИУ-1" list="grp-dl"/>
+      <div class="form-group"><label>Група</label><input id="sf-gname" placeholder="1" list="grp-dl"/>
         <datalist id="grp-dl">${S.groups.map(g=>`<option value="${g.name}">`).join('')}</datalist></div>
       <div class="form-group"><label>Курс (1–5)</label><input type="number" id="sf-gyear" value="1" min="1" max="5"/></div>
       <div class="form-group"><label>Специалност</label><input id="sf-gmajor" placeholder="КСТ" list="maj-dl"/>
@@ -371,6 +376,7 @@ function filterTeachers() {
   S.filtered.teachers = S.teachers.filter(t => t.name.toLowerCase().includes(q) || (t.department||'').toLowerCase().includes(q));
   S.cpag.teachers = 1; renderTeachers();
 }
+
 function renderTeachers() {
   const arr = S.filtered.teachers, page = slicePage(arr, 'teachers');
   const tbody = document.getElementById('tch-tbody');
@@ -380,10 +386,12 @@ function renderTeachers() {
     <td style="color:var(--txt3);font-size:13px">${t.title||'—'}</td>
     <td><strong>${t.name}</strong></td>
     <td>${t.department||'—'}</td>
-    <td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openTeacherModal(${t.id})">✏️</button></div></td>
+    <td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openTeacherModal(${t.id})">✏️</button>
+    <button class="btn btn-danger btn-sm btn-icon" onclick="deleteTeacher(${t.id})">🗑️</button></div></td>
   </tr>`).join('');
   buildPag(document.getElementById('tch-pag'), arr, 'teachers', renderTeachers);
 }
+
 function openTeacherModal(id) {
   const t = id ? S.teachers.find(x => x.id === id) : null, isEdit = !!t;
   document.getElementById('modal-title').textContent = isEdit ? 'Редактиране на преподавател' : 'Регистрация на преподавател';
@@ -429,6 +437,7 @@ function filterGroups() {
   S.filtered.groups = S.groups.filter(g => g.name.toLowerCase().includes(q) || g.major.toLowerCase().includes(q));
   S.cpag.groups = 1; renderGroups();
 }
+
 function renderGroups() {
   const arr = S.filtered.groups, page = slicePage(arr, 'groups');
   const tbody = document.getElementById('grp-tbody');
@@ -437,15 +446,17 @@ function renderGroups() {
     const sc = S.students.filter(s => s.group_id === g.id).length;
     return `<tr><td class="td-id">${g.id}</td><td><strong>${g.name}</strong></td><td>${g.year} курс</td><td>${g.major}</td>
       <td><span class="badge badge-navy">${sc}</span></td>
-      <td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openGroupModal(${g.id})">✏️</button></div></td></tr>`;
+        <td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openGroupModal(${g.id})">✏️</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteGroup(${g.id})">🗑️</button></div></td></tr>`;
   }).join('');
   buildPag(document.getElementById('grp-pag'), arr, 'groups', renderGroups);
 }
+
 function openGroupModal(id) {
   const g = id ? S.groups.find(x => x.id === id) : null;
   document.getElementById('modal-title').textContent = g ? 'Редактиране на група' : 'Нова група';
   document.getElementById('modal-body').innerHTML = `<div class="form-grid">
-    <div class="form-group"><label>Название</label><input id="gf-name" value="${g?g.name:''}" placeholder="ИУ-1"/></div>
+    <div class="form-group"><label>Название</label><input id="gf-name" value="${g?g.name:''}" placeholder="1"/></div>
     <div class="form-group"><label>Курс (1–5)</label><input type="number" id="gf-year" value="${g?g.year:1}" min="1" max="5"/></div>
     <div class="form-group form-full"><label>Специалност</label><input id="gf-major" value="${g?g.major:''}" placeholder="КСТ"/></div>
   </div>`;
@@ -466,14 +477,17 @@ function filterCourses() {
   S.filtered.courses = S.courses.filter(c => c.name.toLowerCase().includes(q));
   S.cpag.courses = 1; renderCourses();
 }
+
 function renderCourses() {
   const arr = S.filtered.courses, page = slicePage(arr, 'courses');
   const tbody = document.getElementById('crs-tbody');
   if (!arr.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="3">Няма намерени дисциплини.</td></tr>'; return; }
   tbody.innerHTML = page.map(c => `<tr><td class="td-id">${c.id}</td><td>${c.name}</td>
-    <td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openCourseModal(${c.id})">✏️</button></div></td></tr>`).join('');
+    <td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openCourseModal(${c.id})">✏️</button>
+    <button class="btn btn-danger btn-sm btn-icon" onclick="deleteCourse(${c.id})">🗑️</button></div></td></tr>`).join('');
   buildPag(document.getElementById('crs-pag'), arr, 'courses', renderCourses);
 }
+
 function openCourseModal(id) {
   const c = id ? S.courses.find(x => x.id === id) : null;
   document.getElementById('modal-title').textContent = c ? 'Редактиране на дисциплина' : 'Нова дисциплина';
@@ -500,6 +514,7 @@ function filterGC() {
   });
   S.cpag.gc = 1; renderGC();
 }
+
 function renderGC() {
   const arr = S.filtered.gc, page = slicePage(arr, 'gc');
   const tbody = document.getElementById('gc-tbody');
@@ -511,10 +526,14 @@ function renderGC() {
       <td>${c.name}</td><td>${typeBadge(gc.type)}</td>
       <td>${t?`<span class="chip">${t.title?t.title+' ':''}${t.name}</span>`:'<span style="color:var(--txt3)">—</span>'}</td>
       <td>${gc.semester||'—'}</td>
-      <td><div class="td-actions"><button class="btn btn-ghost btn-sm btn-icon" onclick="openGCModal(${gc.id})">✏️</button></div></td></tr>`;
+      <td><div class="td-actions">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openGCModal(${gc.id})">✏️</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteGC(${gc.id})">🗑️</button>
+      </div></td></tr>`;
   }).join('');
   buildPag(document.getElementById('gc-pag'), arr, 'gc', renderGC);
 }
+
 function openGCModal(id) {
   const gc = id ? S.groupCourses.find(x => x.id === id) : null;
   const grpOpts = S.groups.map(g=>`<option value="${g.id}" ${gc&&gc.group_id===g.id?'selected':''}>${g.name} – ${g.year}к., ${g.major}</option>`).join('');
@@ -550,6 +569,7 @@ function filterSchedules() {
   });
   S.cpag.schedules = 1; renderSchedules();
 }
+
 function renderSchedules() {
   document.getElementById('sched-add-btn').style.display = S.role === 'admin' ? '' : 'none';
   const arr = S.filtered.schedules, page = slicePage(arr, 'schedules');
@@ -565,10 +585,12 @@ function renderSchedules() {
       <td>${s.subgroup||'—'}</td>
       <td><span class="badge ${s.is_biweekly?'badge-amber':'badge-green'}">${s.is_biweekly?'Двуседм.':'Всяка'}</span></td>
       <td style="font-size:12px;color:var(--txt3)">${fmtDate(s.start_date)} → ${fmtDate(s.end_date)}</td>
-      <td><div class="td-actions">${S.role==='admin'?`<button class="btn btn-ghost btn-sm btn-icon" onclick="openScheduleModal(${s.id})">✏️</button>`:''}</div></td></tr>`;
+      <td><div class="td-actions">${S.role==='admin'?`<button class="btn btn-ghost btn-sm btn-icon" onclick="openScheduleModal(${s.id})">✏️</button>
+      <button class="btn btn-danger btn-sm btn-icon" onclick="deleteSchedule(${s.id})">🗑️</button>`:''}</div></td></tr>`;
   }).join('');
   buildPag(document.getElementById('sched-pag'), arr, 'schedules', renderSchedules);
 }
+
 function openScheduleModal(id) {
   const s = id ? S.schedules.find(x => x.id === id) : null;
   const gcOpts = S.groupCourses.map(gc => {
@@ -606,10 +628,12 @@ function debouncedAttSearch() {
   clearTimeout(_attDeb);
   _attDeb = setTimeout(() => { S.att.search = $v('att-search'); S.att.skip = 0; renderAttendance(); }, 350);
 }
+
 function attChangePerPage() {
   S.att.limit = parseInt(document.getElementById('att-per-page').value);
   S.att.skip = 0; renderAttendance();
 }
+
 async function renderAttendance() {
   const canEdit = S.role === 'admin' || S.role === 'teacher';
   document.getElementById('att-add-btn').style.display = canEdit ? '' : 'none';
@@ -637,6 +661,7 @@ async function renderAttendance() {
     tbody.innerHTML = `<tr class="empty-row"><td colspan="7" style="color:var(--red)">Грешка: ${e.message}</td></tr>`;
   }
 }
+
 function buildAttPag() {
   const cont = document.getElementById('att-pag'); cont.innerHTML = '';
   const { total, limit, skip } = S.att;
@@ -655,6 +680,7 @@ function buildAttPag() {
   wrap.appendChild(mk('›',cur>=pages,false,()=>{S.att.skip=skip+limit;renderAttendance();}));
   cont.appendChild(wrap);
 }
+
 function editAttStatus(id, curr) {
   const opts = ['Присъствие','Отработване','Извинено'].map(s=>`<option value="${s}" ${s===curr?'selected':''}>${s}</option>`).join('');
   document.getElementById('modal-title').textContent = 'Промяна на статус';
@@ -662,11 +688,44 @@ function editAttStatus(id, curr) {
   S.modalCallback = async () => { await api('PATCH', `/attendance/${id}`, { status:$v('att-sel') }); renderAttendance(); toast('Статусът е обновен.','success'); };
   showModal();
 }
+
 async function deleteAtt(id) {
   if (!confirm('Изтриване на записа за присъствие?')) return;
   try { await api('DELETE', `/attendance/${id}`); renderAttendance(); toast('Записът е изтрит.','success'); }
   catch(e) { toast(e.message, 'error'); }
 }
+
+async function deleteStudent(id) {
+  if (!confirm('Изтриване на студента? Ще бъдат изтрити и присъствията му.')) return;
+  try { await api('DELETE', `/auth/students/${id}`); await loadRefData(); filterStudents(); toast('Студентът е изтрит.', 'success'); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function deleteTeacher(id) {
+  if (!confirm('Изтриване на преподавателя?')) return;
+  try { await api('DELETE', `/auth/teachers/${id}`); await loadRefData(); filterTeachers(); toast('Преподавателят е изтрит.', 'success'); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function deleteGroup(id) {
+  if (!confirm('Изтриване на групата?')) return;
+  try { await api('DELETE', `/admin/groups/${id}`); await loadRefData(); filterGroups(); toast('Групата е изтрита.', 'success'); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function deleteCourse(id) {
+  if (!confirm('Изтриване на дисциплината?')) return;
+  try { await api('DELETE', `/admin/courses/${id}`); await loadRefData(); filterCourses(); toast('Дисциплината е изтрита.', 'success'); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function deleteGC(id) {
+  if (!confirm('Изтриване на зачисляването от учебния план?')) return;
+  try { await api('DELETE', `/admin/group-courses/${id}`); await loadRefData(); filterGC(); toast('Зачисляването е изтрито.', 'success'); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function deleteSchedule(id) {
+  if (!confirm('Изтриване на занятието от графика?')) return;
+  try { await api('DELETE', `/admin/schedules/${id}`); await loadRefData(); filterSchedules(); toast('Занятието е изтрито.', 'success'); }
+  catch(e) { toast(e.message, 'error'); }
+}
+
 function openAttAddModal() {
   const gcOpts = S.schedules.map(s=>`<option value="${s.id}">${scheduleLabel(s)}</option>`).join('');
   const stuOpts = S.students.map(s=>`<option value="${s.student_id}">${s.name} (ФН: ${s.faculty_number})</option>`).join('');
@@ -685,6 +744,7 @@ function openAttAddModal() {
   showModal();
 }
 
+
 // ================================================================
 //  ADD ATTENDANCE SECTION (Teacher)
 // ================================================================
@@ -694,6 +754,7 @@ function renderAddAtt() {
   document.getElementById('fa-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('fa-result').innerHTML = '';
 }
+
 function faSchedChanged() {
   const sid = parseInt($v('fa-sched'));
   const sel = document.getElementById('fa-student');
@@ -702,6 +763,7 @@ function faSchedChanged() {
   const stus = gc ? getStusByGroup(gc.group_id) : [];
   sel.innerHTML = stus.length ? stus.map(s=>`<option value="${s.student_id}">${s.name} (ФН: ${s.faculty_number})</option>`).join('') : '<option value="">Няма студенти в тази група</option>';
 }
+
 async function submitAddAttendance() {
   const sched_id=$v('fa-sched'), student_id=$v('fa-student'), date=$v('fa-date'), status=$v('fa-status');
   const res = document.getElementById('fa-result');
@@ -713,6 +775,7 @@ async function submitAddAttendance() {
     setTimeout(resetAddAttForm, 2000);
   } catch(e) { res.innerHTML=`<p class="fa-result-err">⚠️ ${e.message}</p>`; }
 }
+
 function resetAddAttForm() {
   document.getElementById('fa-sched').value = '';
   document.getElementById('fa-student').innerHTML = '<option value="">— Изберете занятие първо —</option>';
@@ -727,6 +790,7 @@ function resetAddAttForm() {
 function showModal() { document.getElementById('modal-overlay').classList.add('show'); }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); S.modalCallback = null; }
 function modalOverlayClick(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
+
 async function modalSubmit() {
   if (!S.modalCallback) return;
   const btn = document.getElementById('modal-submit');
@@ -754,6 +818,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
   if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
 });
+
 document.getElementById('hamburger').onclick = openSidebar;
 document.getElementById('sidebar-backdrop').onclick = closeSidebar;
 

@@ -6,10 +6,10 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, delete
 from typing import List, Optional
 
-from models import AsyncSessionLocal, Student, Teacher, User, engine_url, Group
+from models import AsyncSessionLocal, Student, Teacher, User, engine_url, Group, GroupCourse, Attendance
 from schemas import (
     GroupOut, StudentOut, StudentUpdate, TeacherOut, TeacherUpdate,
     Token, TokenData, UserCreate, UserOut,
@@ -299,3 +299,42 @@ async def get_students(db: AsyncSession = Depends(get_async_session)):
 @router.get("/teachers", response_model=List[TeacherOut], dependencies=[Depends(require_any_role(["admin", "teacher"]))])
 async def get_teachers(db: AsyncSession = Depends(get_async_session)):
     return (await db.execute(select(Teacher))).scalars().all()
+
+@router.delete("/students/{student_id}", dependencies=[Depends(require_role("admin"))])
+async def delete_student(student_id: int, db: AsyncSession = Depends(get_async_session)):
+    student = await db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Студентът не е намерен.")
+
+    try:
+        # Изтриваме присъствията на студента
+        await db.execute(delete(Attendance).where(Attendance.student_id == student_id))
+        # Изтриваме свързания потребителски акаунт (ако има)
+        await db.execute(delete(User).where(User.linked_student_id == student_id))
+        await db.delete(student)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Системна грешка: {str(e)}")
+
+    return {"detail": f"Студентът {student.name} е изтрит успешно."}
+
+
+@router.delete("/teachers/{teacher_id}", dependencies=[Depends(require_role("admin"))])
+async def delete_teacher(teacher_id: int, db: AsyncSession = Depends(get_async_session)):
+    teacher = await db.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Преподавателят не е намерен.")
+
+    res = await db.execute(select(GroupCourse).where(GroupCourse.teacher_id == teacher_id))
+    if res.scalars().first():
+        raise HTTPException(
+            status_code=400,
+            detail="Преподавателят води часове по учебния план. Премахнете го от тях първо."
+        )
+
+    await db.execute(delete(User).where(User.linked_teacher_id == teacher_id))
+    await db.delete(teacher)
+    await db.commit()
+    return {"detail": f"Преподавателят {teacher.name} е изтрит успешно."}
+
